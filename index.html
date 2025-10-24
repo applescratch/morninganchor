@@ -147,7 +147,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -189,10 +189,8 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // CRITICAL FIX: Set persistence to session to prevent immediate token drop
-                // This correctly imports persistence from auth.js (Fixes "unknown export" error)
-                await setPersistence(auth, browserSessionPersistence);
-
+                // NO PERSISTENCE SETTING TO PREVENT BLOCKED SESSIONS
+                
                 // Set up listener to manage session state globally
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
@@ -210,8 +208,7 @@
                     }
                 });
 
-                // Force Anonymous Sign In on Load (No pop-up needed)
-                await signInAnonymously(auth);
+                // NO AUTOMATIC SIGN-IN HERE. User must click RECONNECT.
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -233,15 +230,15 @@
                 displayMessage('Already signed in!', 'success');
                 return;
             }
-            displayMessage('Attempting Reconnect...', 'success');
+            displayMessage('Attempting Sign In...', 'success');
             
             try {
-                // Force Anonymous Sign In
+                // Final strategy: Force Anonymous Sign In to get a fresh, temporary token
                 await signInAnonymously(auth);
                 // onAuthStateChanged listener handles the success
             } catch (error) {
                 console.error("Anonymous Sign In Failed:", error);
-                displayMessage('Failed to reconnect. Please refresh the page.', 'error');
+                displayMessage('Failed to connect. Please clear site data and refresh.', 'error');
             }
         }
 
@@ -326,7 +323,10 @@
                 hideLoading();
             }, (error) => {
                 console.error("Firestore Snapshot Error:", error);
-                displayMessage('Error loading data. Check connection and sign in.', 'error');
+                // Only show a critical error if connection fails AFTER authentication
+                if (isAuthenticated) {
+                    displayMessage('Error loading data. Check connection.', 'error');
+                }
                 hideLoading();
             });
         }
