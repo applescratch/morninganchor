@@ -144,7 +144,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -173,7 +173,6 @@
         let recognition = null; // For Speech-to-Text
         
         // --- API KEY HANDLING (CRITICAL FIX) ---
-        // Load key from localStorage if available, otherwise use empty string (for Canvas environment)
         let savedApiKey = localStorage.getItem('GEMINI_API_KEY') || "";
 
         // --- AUTHENTICATION STATE TRACKING ---
@@ -200,14 +199,13 @@
                     } else {
                         userId = null;
                         isAuthenticated = false;
-                        document.getElementById('user-id').textContent = 'Session: Disconnected';
+                        document.getElementById('user-id').textContent = 'Session: Disconnected. Sign In to save.';
                         document.getElementById('user-id').style.color = '#cc0000'; // Red for disconnected state
                         hideLoading();
                     }
                 });
 
-                // NO AUTOMATIC SIGN-IN HERE. Wait for user to click RECONNECT.
-                // The onAuthStateChanged listener will fire immediately if a session exists.
+                // NO AUTOMATIC SIGN-IN HERE. The user must click RECONNECT.
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -227,11 +225,12 @@
         async function reconnectSession() {
             try {
                 displayMessage('Attempting sign-in...', 'success');
-                // Force a sign-in attempt
+                // Use a generic anonymous sign-in for stability on external hosts
+                const { signInAnonymously } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
                 await signInAnonymously(auth);
                 // onAuthStateChanged listener will update the UI and load data
             } catch (e) {
-                displayMessage('Failed to sign in. Please refresh the page.', 'error');
+                displayMessage('Failed to sign in. Please refresh the page and try again.', 'error');
             }
         }
 
@@ -338,14 +337,14 @@
             } catch (e) {
                 // FINAL FIX: This is the failure point. Prompt user to copy/refresh.
                 document.getElementById('emergency-save-message').style.display = 'block';
-                displayMessage('CRITICAL SAVE FAILURE: Checkbox save failed. Please COPY your text and refresh.', 'error');
+                displayMessage('CRITICAL SAVE FAILURE: Checkbox save failed. Click RECONNECT/SIGN IN.', 'error');
             }
         }
 
         async function saveLongText(fieldId, dataField, checkboxId) {
             // PROACTIVE AUTH CHECK (The Fix)
             if (!isAuthenticated) {
-                 displayMessage('CRITICAL SAVE FAILURE: Session lost. Please copy text and click RECONNECT.', 'error');
+                 displayMessage('CRITICAL SAVE FAILURE: Session lost. Copy text, then click RECONNECT.', 'error');
                  document.getElementById('emergency-save-message').style.display = 'block';
                  return; 
             }
@@ -379,7 +378,7 @@
                 console.error("Long text save failed:", e);
                 // FINAL FIX: Provide explicit instructions to user on how to recover data before refreshing
                 document.getElementById('emergency-save-message').style.display = 'block';
-                displayMessage('CRITICAL SAVE FAILURE: Session expired. COPY your text NOW, then refresh the page to reconnect.', 'error');
+                displayMessage('CRITICAL SAVE FAILURE: Session expired. COPY your text NOW, then click RECONNECT.', 'error');
             }
         }
         
