@@ -147,7 +147,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously, setPersistence, browserSessionPersistence, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -189,14 +189,12 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // NO PERSISTENCE SETTING TO PREVENT BLOCKED SESSIONS
-                
                 // Set up listener to manage session state globally
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
                         isAuthenticated = true;
-                        document.getElementById('user-id').textContent = `Session: Connected (User ${userId.substring(0, 8)}...)`;
+                        document.getElementById('user-id').textContent = `Session: Connected (User ${user.displayName || user.email || userId.substring(0, 8)}...)`;
                         document.getElementById('user-id').style.color = '#ffb6c1'; // Soft Pink for connected state
                         loadDailyData();
                     } else {
@@ -208,7 +206,7 @@
                     }
                 });
 
-                // NO AUTOMATIC SIGN-IN HERE. User must click RECONNECT.
+                // --- NO AUTOMATIC SIGN-IN HERE. User must click RECONNECT.
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -230,15 +228,25 @@
                 displayMessage('Already signed in!', 'success');
                 return;
             }
-            displayMessage('Attempting Sign In...', 'success');
+            displayMessage('Opening Google Sign In...', 'success');
             
             try {
-                // Final strategy: Force Anonymous Sign In to get a fresh, temporary token
-                await signInAnonymously(auth);
-                // onAuthStateChanged listener handles the success
+                const provider = new GoogleAuthProvider();
+                // Ensure pop-ups are allowed and try refreshing the page after authorizing the domain
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged listener will handle the success flow
             } catch (error) {
-                console.error("Anonymous Sign In Failed:", error);
-                displayMessage('Failed to connect. Please clear site data and refresh.', 'error');
+                console.error("Google Sign In Failed:", error);
+                
+                let errorMessage = 'Sign In failed. Ensure pop-ups are allowed and try refreshing the page.';
+                
+                if (error.code === 'auth/unauthorized-domain') {
+                    errorMessage = 'Error: Unauthorized Domain. You must add this URL to your Firebase Authentication settings.';
+                } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                     errorMessage = 'Sign In cancelled. Please click RECONNECT again.';
+                } 
+
+                displayMessage(errorMessage, 'error');
             }
         }
 
@@ -325,7 +333,7 @@
                 console.error("Firestore Snapshot Error:", error);
                 // Only show a critical error if connection fails AFTER authentication
                 if (isAuthenticated) {
-                    displayMessage('Error loading data. Check connection.', 'error');
+                    displayMessage('Error loading data. Check connection and sign in.', 'error');
                 }
                 hideLoading();
             });
