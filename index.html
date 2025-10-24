@@ -147,7 +147,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously, setPersistence, browserSessionPersistence, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously, setPersistence, browserSessionPersistence, GoogleAuthProvider, signInWithRedirect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -205,6 +205,17 @@
                         hideLoading();
                     }
                 });
+                
+                // CRITICAL REDIRECT CHECK: Check if the user is returning from a sign-in redirect
+                // const { getRedirectResult } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                // getRedirectResult(auth).then((result) => {
+                //     if (result) {
+                //         displayMessage("Successfully signed in with Google!", 'success');
+                //     }
+                // }).catch((error) => {
+                //     console.error("Redirect sign-in error:", error);
+                //     displayMessage(`Redirect Sign In Failed: ${error.message}`, 'error');
+                // });
 
                 // --- NO AUTOMATIC SIGN-IN HERE. User must click RECONNECT.
 
@@ -228,23 +239,23 @@
                 displayMessage('Already signed in!', 'success');
                 return;
             }
-            displayMessage('Opening Google Sign In...', 'success');
+            displayMessage('Redirecting to Google Sign In...', 'success');
             
             try {
                 const provider = new GoogleAuthProvider();
-                // Ensure pop-ups are allowed and try refreshing the page after authorizing the domain
-                await signInWithPopup(auth, provider);
-                // onAuthStateChanged listener will handle the success flow
+                // FINAL FIX: Use Redirect to bypass mobile pop-up block
+                await signInWithRedirect(auth, provider);
+                // The page will reload and the listener will catch the result
             } catch (error) {
                 console.error("Google Sign In Failed:", error);
                 
-                let errorMessage = 'Sign In failed. Ensure pop-ups are allowed and try refreshing the page.';
+                let errorMessage = 'Sign In failed. You must authorize your domain in Firebase Console.';
                 
                 if (error.code === 'auth/unauthorized-domain') {
                     errorMessage = 'Error: Unauthorized Domain. You must add this URL to your Firebase Authentication settings.';
-                } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-                     errorMessage = 'Sign In cancelled. Please click RECONNECT again.';
-                } 
+                } else {
+                     errorMessage = `Sign In failed. Error: ${error.message}. Please try again.`;
+                }
 
                 displayMessage(errorMessage, 'error');
             }
