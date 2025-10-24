@@ -122,6 +122,25 @@
             width: 100%;
             padding-top: 8px;
         }
+        /* Emergency Message Styling */
+        #emergency-save-message {
+            background-color: #fcebeb; /* Light red/pink background */
+            color: #cc0000;
+            border: 2px solid #cc0000;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .emergency-btn {
+            background-color: #cc0000;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 10px;
+            width: 100%;
+        }
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -319,14 +338,10 @@
         async function saveLongText(fieldId, dataField, checkboxId) {
             // PROACTIVE AUTH CHECK (The Fix)
             if (!userId || !auth.currentUser || !auth.currentUser.uid) {
-                displayMessage('Session lost. Reconnecting...', 'error');
-                try {
-                    await signInAnonymously(auth);
-                    userId = auth.currentUser.uid;
-                } catch (e) {
-                    displayMessage('Failed to reconnect. Please refresh the page.', 'error');
-                    return;
-                }
+                // Display emergency message and prompt manual recovery
+                document.getElementById('emergency-save-message').style.display = 'block';
+                displayMessage('CRITICAL SAVE FAILURE: Session lost. Please copy text and reconnect.', 'error');
+                return; 
             }
             
             const text = document.getElementById(fieldId).value;
@@ -354,11 +369,12 @@
             try {
                 await setDoc(docRef, updates, { merge: true });
                 displayMessage('Log Saved!');
+                document.getElementById('emergency-save-message').style.display = 'none'; // Clear emergency message on success
             } catch (e) {
-                console.error("Long text save failed, attempting final re-auth:", e);
+                console.error("Long text save failed:", e);
                 // FINAL FIX: Provide explicit instructions to user on how to recover data before refreshing
+                document.getElementById('emergency-save-message').style.display = 'block';
                 displayMessage('CRITICAL SAVE FAILURE: Session expired. COPY your text NOW, then refresh the page to reconnect.', 'error');
-                await auth.currentUser.reload(); // Still try to reload silently
             }
         }
         
