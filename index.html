@@ -176,6 +176,9 @@
         // Load key from localStorage if available, otherwise use empty string (for Canvas environment)
         let savedApiKey = localStorage.getItem('GEMINI_API_KEY') || "";
 
+        // --- AUTHENTICATION STATE TRACKING ---
+        let isAuthenticated = false;
+
 
         // --- FIREBASE INITIALIZATION AND AUTHENTICATION ---
         async function initializeFirebase() {
@@ -184,28 +187,28 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
-                
-                let authPromise;
-                if (initialAuthToken) {
-                    authPromise = signInWithCustomToken(auth, initialAuthToken).catch(e => {
-                        console.error("Custom token sign-in failed, falling back to anonymous:", e);
-                        return signInAnonymously(auth);
-                    });
-                } else {
-                    authPromise = signInAnonymously(auth);
-                }
-
-                await authPromise.then((cred) => {
-                    userId = cred.user.uid;
-                    document.getElementById('user-id').textContent = `User ID: ${userId.substring(0, 8)}...`;
-                    document.getElementById('today-date').textContent = `Date: ${formattedDate}`;
-                    loadDailyData();
-                }).catch((error) => {
-                    console.error("Final Authentication Failed:", error);
-                    displayMessage('Authentication failed. App unusable.', 'error');
-                    hideLoading();
+                // Set up listener to manage session state globally
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthenticated = true;
+                        document.getElementById('user-id').textContent = `Session: Connected (User ${userId.substring(0, 8)}...)`;
+                        document.getElementById('user-id').style.color = '#ffb6c1'; // Soft Pink for connected state
+                        loadDailyData();
+                    } else {
+                        userId = null;
+                        isAuthenticated = false;
+                        document.getElementById('user-id').textContent = 'Session: Disconnected';
+                        document.getElementById('user-id').style.color = '#cc0000'; // Red for disconnected state
+                        hideLoading();
+                    }
                 });
+
+                // Trigger manual sign in on initial load if no token is present
+                // NOTE: The loadDailyData() call inside onAuthStateChanged will handle the rest
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -221,6 +224,17 @@
                 hideLoading();
             }
         }
+        
+        async function reconnectSession() {
+            try {
+                displayMessage('Attempting sign-in...', 'success');
+                await signInAnonymously(auth);
+                // onAuthStateChanged listener will update the UI and load data
+            } catch (e) {
+                displayMessage('Failed to sign in. Please refresh the page.', 'error');
+            }
+        }
+
 
         // --- API KEY CONFIGURATION ---
         function saveApiKey() {
@@ -309,14 +323,9 @@
 
         async function toggleDiscipline(event) {
             // PROACTIVE AUTH CHECK (Critical for saving)
-            if (!userId || !auth.currentUser || !auth.currentUser.uid) {
-                displayMessage('Session lost. Reconnecting...', 'error');
-                await signInAnonymously(auth);
-                userId = auth.currentUser ? auth.currentUser.uid : null;
-                if (!userId) {
-                    displayMessage('Failed to reconnect. Please refresh the page.', 'error');
-                    return;
-                }
+            if (!isAuthenticated) {
+                displayMessage('Session lost. Click "RECONNECT" above to sign in.', 'error');
+                return;
             }
             
             const field = event.target.dataset.field;
@@ -335,11 +344,10 @@
 
         async function saveLongText(fieldId, dataField, checkboxId) {
             // PROACTIVE AUTH CHECK (The Fix)
-            if (!userId || !auth.currentUser || !auth.currentUser.uid) {
-                // Display emergency message and prompt manual recovery
-                document.getElementById('emergency-save-message').style.display = 'block';
-                displayMessage('CRITICAL SAVE FAILURE: Session lost. Please copy text and reconnect.', 'error');
-                return; 
+            if (!isAuthenticated) {
+                 displayMessage('CRITICAL SAVE FAILURE: Session lost. Please copy text and click RECONNECT.', 'error');
+                 document.getElementById('emergency-save-message').style.display = 'block';
+                 return; 
             }
             
             const text = document.getElementById(fieldId).value;
@@ -358,7 +366,6 @@
                 try {
                     await setDoc(getDailyDocRef(userId), { [checkboxField]: true }, { merge: true });
                 } catch (e) {
-                    // Fail silently, but log it
                     console.warn('Failed to auto-check box, proceeding with text save.');
                 }
             }
@@ -377,36 +384,47 @@
         }
         
         async function loadJournalHistory() {
-            document.getElementById('history-output').innerHTML = '<p class="text-teal-600">Loading history...</p>';
-            const q = query(getCollectionRef(userId));
-            const querySnapshot = await getDocs(q);
-            
-            if (querySnapshot.empty) {
-                document.getElementById('history-output').innerHTML = '<p class="text-gray-500">No past entries found.</p>';
+            if (!isAuthenticated) {
+                document.getElementById('history-output').innerHTML = '<p class="text-red-500">History failed to load. Please sign in first.</p>';
                 return;
             }
             
-            let historyHTML = '';
-            querySnapshot.forEach(doc => {
-                const data = doc.data();
-                const date = doc.id;
-                
-                const reflection = data.JournalLog ? `**Reflection:** ${data.JournalLog.substring(0, 150)}...` : '';
-                const dream = data.DreamLog ? `**Dream/Vision:** ${data.DreamLog.substring(0, 150)}...` : '';
-                
-                if (reflection || dream) {
-                    historyHTML += `
-                        <div class="history-entry">
-                            <p class="font-bold text-lg text-teal-700">${date}</p>
-                            ${reflection ? `<p class="mt-1 text-sm">${reflection}</p>` : ''}
-                            ${dream ? `<p class="mt-1 text-sm">${dream}</p>` : ''}
-                        </div>
-                    `;
-                }
-            });
+            document.getElementById('history-output').innerHTML = '<p class="text-teal-600">Loading history...</p>';
+            const q = query(getCollectionRef(userId));
             
-            document.getElementById('history-output').innerHTML = historyHTML;
-            document.getElementById('copy-history-btn').style.display = 'block';
+            try {
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    document.getElementById('history-output').innerHTML = '<p class="text-gray-500">No past entries found.</p>';
+                    return;
+                }
+                
+                let historyHTML = '';
+                querySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const date = doc.id;
+                    
+                    const reflection = data.JournalLog ? `**Reflection:** ${data.JournalLog.substring(0, 150)}...` : '';
+                    const dream = data.DreamLog ? `**Dream/Vision:** ${data.DreamLog.substring(0, 150)}...` : '';
+                    
+                    if (reflection || dream) {
+                        historyHTML += `
+                            <div class="history-entry">
+                                <p class="font-bold text-lg text-teal-700">${date}</p>
+                                ${reflection ? `<p class="mt-1 text-sm">${reflection}</p>` : ''}
+                                ${dream ? `<p class="mt-1 text-sm">${dream}</p>` : ''}
+                            </div>
+                        `;
+                    }
+                });
+                
+                document.getElementById('history-output').innerHTML = historyHTML;
+                document.getElementById('copy-history-btn').style.display = 'block';
+            } catch (e) {
+                console.error("History load error:", e);
+                 document.getElementById('history-output').innerHTML = `<p class="text-red-500">Error: Could not load history. Please ensure you are signed in.</p>`;
+            }
         }
 
         async function copyAllHistoryText() {
@@ -706,6 +724,7 @@
             document.getElementById('timer-btn').addEventListener('click', startTimer);
             document.getElementById('save-api-key-btn').addEventListener('click', saveApiKey);
             document.getElementById('verify-key-btn').addEventListener('click', displaySavedKey); // Debug button
+            document.getElementById('reconnect-btn').addEventListener('click', initializeFirebase); // Manual reconnect button
             
             // Wire up speech-to-text buttons
             document.getElementById('mic-dream-btn').addEventListener('click', (e) => {
@@ -777,7 +796,7 @@
         <div class="card color-teal text-white p-4" style="background-color: #008080;">
             <div class="header-content">
                 <h1 class="text-xl font-bold">The Morning Anchor Checklist</h1>
-                <p id="user-id" class="text-sm">User ID: Loading...</p>
+                <p id="user-id" class="text-sm">Session: Disconnected</p>
                 <p id="today-date" class="text-sm font-semibold">Date: Loading...</p>
             </div>
             <div class="mt-2 streak-box">
@@ -786,6 +805,9 @@
                     <span id="streak-count" class="text-4xl font-extrabold text-white leading-none">0</span>
                 </div>
             </div>
+            <button id="reconnect-btn" class="mt-3 w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
+                RECONNECT / SIGN IN
+            </button>
         </div>
 
         <!-- 1-MINUTE READ TIMER -->
