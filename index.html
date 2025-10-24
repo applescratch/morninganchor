@@ -131,6 +131,9 @@
             margin-top: 10px;
             border-radius: 8px;
             text-align: center;
+            /* Added margin and z-index to ensure visibility */
+            margin-bottom: 15px; 
+            z-index: 900; 
         }
         .emergency-btn {
             background-color: #cc0000;
@@ -144,7 +147,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -186,12 +189,16 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
+                // CRITICAL FIX: Set persistence to session to prevent immediate token drop
+                // This correctly imports persistence from auth.js (Fixes "unknown export" error)
+                await setPersistence(auth, browserSessionPersistence);
+
                 // Set up listener to manage session state globally
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
                         isAuthenticated = true;
-                        document.getElementById('user-id').textContent = `Session: Connected (User ${user.displayName || user.email || userId.substring(0, 8)}...)`;
+                        document.getElementById('user-id').textContent = `Session: Connected (User ${userId.substring(0, 8)}...)`;
                         document.getElementById('user-id').style.color = '#ffb6c1'; // Soft Pink for connected state
                         loadDailyData();
                     } else {
@@ -202,6 +209,9 @@
                         hideLoading();
                     }
                 });
+
+                // Force Anonymous Sign In on Load (No pop-up needed)
+                await signInAnonymously(auth);
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -223,23 +233,15 @@
                 displayMessage('Already signed in!', 'success');
                 return;
             }
-            displayMessage('Opening Google Sign In...', 'success');
+            displayMessage('Attempting Reconnect...', 'success');
             
             try {
-                const provider = new GoogleAuthProvider();
-                // Enable Google Sign In
-                await signInWithPopup(auth, provider);
-                // The onAuthStateChanged listener will handle the success flow
+                // Force Anonymous Sign In
+                await signInAnonymously(auth);
+                // onAuthStateChanged listener handles the success
             } catch (error) {
-                console.error("Google Sign In Failed:", error);
-                // Check if error is due to unauthorized domain or popup issues
-                if (error.code === 'auth/unauthorized-domain') {
-                    displayMessage('Error: Unauthorized Domain. You must add this URL to your Firebase Authentication settings.', 'error');
-                } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-                     displayMessage('Sign In cancelled. Please try again.', 'error');
-                } else {
-                     displayMessage('Sign In failed. Ensure pop-ups are allowed and try refreshing the page.', 'error');
-                }
+                console.error("Anonymous Sign In Failed:", error);
+                displayMessage('Failed to reconnect. Please refresh the page.', 'error');
             }
         }
 
@@ -332,6 +334,7 @@
         async function toggleDiscipline(event) {
             // PROACTIVE AUTH CHECK (Critical for saving)
             if (!isAuthenticated) {
+                document.getElementById('emergency-save-message').style.display = 'block';
                 displayMessage('Session lost. Click "RECONNECT / SIGN IN" above.', 'error');
                 return;
             }
@@ -343,6 +346,7 @@
             try {
                 await setDoc(getDailyDocRef(userId), { [field]: isChecked }, { merge: true });
                 displayMessage(`${field} status saved!`);
+                document.getElementById('emergency-save-message').style.display = 'none'; // Clear emergency message on success
             } catch (e) {
                 // FINAL FIX: This is the failure point. Prompt user to copy/refresh.
                 document.getElementById('emergency-save-message').style.display = 'block';
@@ -695,7 +699,7 @@
 
             const prompt = `Analyze the following combined journal entries and dreams. Identify the underlying struggles (e.g., financial worry, self-doubt, decision fatigue, loneliness) and any revealed desires. Based on this analysis, generate a list of 3-5 specific, actionable PRAYER POINTS framed as intercession. Do not offer direct advice; only structure the prayer points. Each prayer point MUST be grounded in Scripture and cite one relevant Bible verse in parentheses (e.g., Romans 8:28).`;
             
-            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a list of 3-5 specific PRAYER POINTS derived directly from the user's emotional struggles and needs, formatted clearly with bullet points. Do not offer suggestions; only frame the action as an invitation to prayer.`;
+            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a list of 3-5 specific PRAYER POINTS derived directly from the user's emotional struggles and needs, formatted clearly with bullet points. Do not offer suggestions; only frame the action as an an invitation to prayer.`;
 
             const insightText = await fetchGemini(prompt, systemInstruction);
             if (insightText) updateAIOutput(insightText);
@@ -822,6 +826,12 @@
             </button>
         </div>
 
+        <!-- EMERGENCY MESSAGE CONTAINER -->
+        <div id="emergency-save-message" style="display: none;">
+            <p class="font-bold mb-2">🛑 CRITICAL SAVE FAILURE 🛑</p>
+            <p class="text-sm">Your secure session was dropped by the browser. **COPY YOUR TEXT NOW,** then click RECONNECT / SIGN IN above.</p>
+        </div>
+
         <!-- 1-MINUTE READ TIMER -->
         <div class="card text-center">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">1. READ: Anchor Minute</h2>
@@ -897,7 +907,7 @@
             </p>
 
             <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:border-[#ccac00]">
+                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:focus:border-[#ccac00]">
                 <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
             </div>
             
