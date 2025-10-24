@@ -187,6 +187,8 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
+                
                 // Set up listener to manage session state globally
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
@@ -204,11 +206,8 @@
                     }
                 });
 
-                // Trigger manual sign in on initial load if no token is present
-                // NOTE: The loadDailyData() call inside onAuthStateChanged will handle the rest
-                if (!auth.currentUser) {
-                    await signInAnonymously(auth);
-                }
+                // NO AUTOMATIC SIGN-IN HERE. Wait for user to click RECONNECT.
+                // The onAuthStateChanged listener will fire immediately if a session exists.
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -228,6 +227,7 @@
         async function reconnectSession() {
             try {
                 displayMessage('Attempting sign-in...', 'success');
+                // Force a sign-in attempt
                 await signInAnonymously(auth);
                 // onAuthStateChanged listener will update the UI and load data
             } catch (e) {
@@ -324,7 +324,7 @@
         async function toggleDiscipline(event) {
             // PROACTIVE AUTH CHECK (Critical for saving)
             if (!isAuthenticated) {
-                displayMessage('Session lost. Click "RECONNECT" above to sign in.', 'error');
+                displayMessage('Session lost. Click "RECONNECT / SIGN IN" above.', 'error');
                 return;
             }
             
@@ -338,7 +338,7 @@
             } catch (e) {
                 // FINAL FIX: This is the failure point. Prompt user to copy/refresh.
                 document.getElementById('emergency-save-message').style.display = 'block';
-                displayMessage('CRITICAL SAVE FAILURE: Checkbox save failed. Please refresh.', 'error');
+                displayMessage('CRITICAL SAVE FAILURE: Checkbox save failed. Please COPY your text and refresh.', 'error');
             }
         }
 
@@ -724,7 +724,7 @@
             document.getElementById('timer-btn').addEventListener('click', startTimer);
             document.getElementById('save-api-key-btn').addEventListener('click', saveApiKey);
             document.getElementById('verify-key-btn').addEventListener('click', displaySavedKey); // Debug button
-            document.getElementById('reconnect-btn').addEventListener('click', initializeFirebase); // Manual reconnect button
+            document.getElementById('reconnect-btn').addEventListener('click', reconnectSession); // Manual reconnect button
             
             // Wire up speech-to-text buttons
             document.getElementById('mic-dream-btn').addEventListener('click', (e) => {
