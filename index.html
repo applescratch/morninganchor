@@ -144,7 +144,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -185,15 +185,13 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
                 
                 // Set up listener to manage session state globally
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
                         isAuthenticated = true;
-                        document.getElementById('user-id').textContent = `Session: Connected (User ${userId.substring(0, 8)}...)`;
+                        document.getElementById('user-id').textContent = `Session: Connected (User ${user.displayName || user.email || userId.substring(0, 8)}...)`;
                         document.getElementById('user-id').style.color = '#ffb6c1'; // Soft Pink for connected state
                         loadDailyData();
                     } else {
@@ -204,8 +202,6 @@
                         hideLoading();
                     }
                 });
-
-                // NO AUTOMATIC SIGN-IN HERE. The user must click RECONNECT.
 
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
@@ -223,14 +219,27 @@
         }
         
         async function reconnectSession() {
+            if (isAuthenticated) {
+                displayMessage('Already signed in!', 'success');
+                return;
+            }
+            displayMessage('Opening Google Sign In...', 'success');
+            
             try {
-                displayMessage('Attempting sign-in...', 'success');
-                // Use a generic anonymous sign-in for stability on external hosts
-                const { signInAnonymously } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-                await signInAnonymously(auth);
-                // onAuthStateChanged listener will update the UI and load data
-            } catch (e) {
-                displayMessage('Failed to sign in. Please refresh the page and try again.', 'error');
+                const provider = new GoogleAuthProvider();
+                // Enable Google Sign In
+                await signInWithPopup(auth, provider);
+                // The onAuthStateChanged listener will handle the success flow
+            } catch (error) {
+                console.error("Google Sign In Failed:", error);
+                // Check if error is due to unauthorized domain or popup issues
+                if (error.code === 'auth/unauthorized-domain') {
+                    displayMessage('Error: Unauthorized Domain. You must add this URL to your Firebase Authentication settings.', 'error');
+                } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                     displayMessage('Sign In cancelled. Please try again.', 'error');
+                } else {
+                     displayMessage('Sign In failed. Ensure pop-ups are allowed and try refreshing the page.', 'error');
+                }
             }
         }
 
@@ -315,7 +324,7 @@
                 hideLoading();
             }, (error) => {
                 console.error("Firestore Snapshot Error:", error);
-                displayMessage('Error loading data. Check connection.', 'error');
+                displayMessage('Error loading data. Check connection and sign in.', 'error');
                 hideLoading();
             });
         }
@@ -472,6 +481,10 @@
         // --- TIMER FUNCTIONS ---
         function startTimer() {
             if (timerInterval) return;
+            if (!isAuthenticated) {
+                displayMessage('Sign in required to start timer and save progress.', 'error');
+                return;
+            }
 
             const timerDisplay = document.getElementById('timer-display');
             const timerButton = document.getElementById('timer-btn');
