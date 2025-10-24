@@ -356,10 +356,9 @@
                 displayMessage('Log Saved!');
             } catch (e) {
                 console.error("Long text save failed, attempting final re-auth:", e);
-                displayMessage('Save failed. Attempting final reconnect...', 'error');
-                await auth.currentUser.reload();
-                await setDoc(docRef, updates, { merge: true });
-                displayMessage('Log Saved after re-auth!');
+                // FINAL FIX: Provide explicit instructions to user on how to recover data before refreshing
+                displayMessage('CRITICAL SAVE FAILURE: Session expired. COPY your text NOW, then refresh the page to reconnect.', 'error');
+                await auth.currentUser.reload(); // Still try to reload silently
             }
         }
         
