@@ -327,11 +327,9 @@
                 await setDoc(getDailyDocRef(userId), { [field]: isChecked }, { merge: true });
                 displayMessage(`${field} status saved!`);
             } catch (e) {
-                console.error("Save failed (setDoc):", e);
-                displayMessage('Save failed. Attempting re-auth and retry...', 'error');
-                await auth.currentUser.reload();
-                await setDoc(getDailyDocRef(userId), { [field]: isChecked }, { merge: true });
-                displayMessage(`${field} status saved after re-auth!`);
+                // FINAL FIX: This is the failure point. Prompt user to copy/refresh.
+                document.getElementById('emergency-save-message').style.display = 'block';
+                displayMessage('CRITICAL SAVE FAILURE: Checkbox save failed. Please refresh.', 'error');
             }
         }
 
@@ -360,8 +358,8 @@
                 try {
                     await setDoc(getDailyDocRef(userId), { [checkboxField]: true }, { merge: true });
                 } catch (e) {
-                    await auth.currentUser.reload();
-                    await setDoc(getDailyDocRef(userId), { [checkboxField]: true }, { merge: true });
+                    // Fail silently, but log it
+                    console.warn('Failed to auto-check box, proceeding with text save.');
                 }
             }
 
