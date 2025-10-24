@@ -147,7 +147,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously, setPersistence, browserSessionPersistence, GoogleAuthProvider, signInWithRedirect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithRedirect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -159,8 +159,17 @@
         const todayKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
         const formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        const app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-anchor-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // --- HARDCODED FIREBASE CONFIG (Required for external hosting) ---
+        // NOTE: This is a placeholder structure. User must update with their own credentials.
+        const PLACEHOLDER_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyC2qZ1m4J4J4J4J4J4J4J4J4J4J4J4J4J4J", // REPLACE THIS WITH YOUR OWN FIREBASE API KEY
+            authDomain: "YOUR-FIREBASE-PROJECT.firebaseapp.com", // REPLACE THIS
+            projectId: "your-firebase-project-id", // REPLACE THIS
+            storageBucket: "your-firebase-project.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef1234567890",
+        };
+        const app_id = PLACEHOLDER_FIREBASE_CONFIG.projectId || 'default-anchor-app';
 
         // Discipline IDs (mapped to database fields and UI)
         const disciplines = {
@@ -185,7 +194,8 @@
         // --- FIREBASE INITIALIZATION AND AUTHENTICATION ---
         async function initializeFirebase() {
             try {
-                const app = initializeApp(firebaseConfig);
+                // FIX: Use hardcoded config now that we are outside of Canvas environment
+                const app = initializeApp(PLACEHOLDER_FIREBASE_CONFIG);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
@@ -206,19 +216,6 @@
                     }
                 });
                 
-                // CRITICAL REDIRECT CHECK: Check if the user is returning from a sign-in redirect
-                // const { getRedirectResult } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-                // getRedirectResult(auth).then((result) => {
-                //     if (result) {
-                //         displayMessage("Successfully signed in with Google!", 'success');
-                //     }
-                // }).catch((error) => {
-                //     console.error("Redirect sign-in error:", error);
-                //     displayMessage(`Redirect Sign In Failed: ${error.message}`, 'error');
-                // });
-
-                // --- NO AUTOMATIC SIGN-IN HERE. User must click RECONNECT.
-
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
                     if (document.getElementById('loading-screen').style.opacity !== '0') {
@@ -229,7 +226,7 @@
 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
-                displayMessage('App initialization failed. Please try again.', 'error');
+                displayMessage('App initialization failed. CHECK FIREBASE CONFIG IN CODE.', 'error');
                 hideLoading();
             }
         }
@@ -302,6 +299,7 @@
 
 
         // --- DATABASE FUNCTIONS ---
+        // Note: app_id is now the projectId for the collections path
         const getDailyDocRef = (uid) => doc(db, `artifacts/${app_id}/users/${uid}/morning_checkins`, todayKey);
         const getCollectionRef = (uid) => collection(db, `artifacts/${app_id}/users/${uid}/morning_checkins`);
 
