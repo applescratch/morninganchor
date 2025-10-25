@@ -37,7 +37,7 @@
         /* Custom Colors */
         .color-mint { background-color: #b5e5cf; } /* Mint Green */
         .color-pink { background-color: #fcb5ac; } /* Light Pink */
-        .color-gold { color: #ccac00; } /* Gold Text */
+        .color-gold { color: #e4c756; } /* Updated Gold Text */
         
         .status-message {
             position: fixed;
@@ -72,8 +72,8 @@
         }
         .ai-output-box {
             background-color: #fcfcf0; /* Cream background */
-            border: 1px solid #ccac00; /* Gold border */
-            border-left: 5px solid #ccac00;
+            border: 1px solid #e4c756; /* Updated Gold border */
+            border-left: 5px solid #e4c756;
             padding: 15px;
             border-radius: 8px;
             white-space: pre-wrap;
@@ -142,11 +142,17 @@
             margin-top: 10px;
             width: 100%;
         }
+        /* History Filter Styles */
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* 3 columns for date/limit */
+            gap: 8px;
+        }
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         setLogLevel('Debug');
@@ -332,8 +338,14 @@
                     // Midnight has passed or first load: Clear journal boxes and save the new load date
                     document.getElementById('dream-log').value = '';
                     document.getElementById('journal-log').value = '';
-                    setDoc(docRef, { lastLoadedDate: todayKey }, { merge: true });
-                    displayMessage('New Day started! Journal cleared.', 'success');
+                    // Only write the load date to mark the new day if a day has actually passed
+                    if (data.lastLoadedDate) { 
+                        setDoc(docRef, { lastLoadedDate: todayKey, DreamLog: '', JournalLog: '' }, { merge: true });
+                        displayMessage('New Day started! Journal cleared.', 'success');
+                    } else {
+                         // On first ever load, just mark the date
+                        setDoc(docRef, { lastLoadedDate: todayKey }, { merge: true });
+                    }
                 }
                 
                 // 1. Update Checkboxes (using the snapshot data)
@@ -357,10 +369,13 @@
                 });
 
                 // 2. Update Long Text Areas (only load data if it wasn't just cleared by new day logic)
-                if (document.getElementById('dream-log').value === '') {
+                // This ensures old data doesn't get pulled back in after a new day starts
+                if (data.lastLoadedDate === todayKey) {
                     document.getElementById('dream-log').value = data.DreamLog || '';
-                }
-                if (document.getElementById('journal-log').value === '') {
+                    document.getElementById('journal-log').value = data.JournalLog || '';
+                } else if (!data.lastLoadedDate) {
+                    // If the field is empty, load it
+                    document.getElementById('dream-log').value = data.DreamLog || '';
                     document.getElementById('journal-log').value = data.JournalLog || '';
                 }
 
@@ -480,7 +495,7 @@
                     const dateMatch = (!filterStartDate || entryDate >= filterStartDate) && 
                                       (!filterEndDate || entryDate <= filterEndDate);
                     
-                    // 2. Keyword Filter
+                    // 2. Keyword Filter (Search in both journal and dream log)
                     const keywordMatch = !filterKeyword || combinedText.toLowerCase().includes(filterKeyword);
                     
                     return dateMatch && keywordMatch;
@@ -1005,7 +1020,7 @@
             </p>
 
             <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:border-[#ccac00]">
+                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#e4c756] p-2 rounded-lg focus:ring-[#e4c756] focus:border-[#e4c756]">
                 <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
             </div>
             
@@ -1024,7 +1039,7 @@
                 </div>
                 
                 <!-- 2. SCRIPTURE SUMMARIZER -->
-                <button id="summarize-scripture-btn" class="w-full bg-[#ccac00] hover:bg-[#a98d00] text-white font-bold py-2 rounded-lg transition duration-150">
+                <button id="summarize-scripture-btn" class="w-full bg-[#e4c756] hover:bg-[#c2a74c] text-white font-bold py-2 rounded-lg transition duration-150">
                     SUMMARIZE SCRIPTURE (Grace Insight)
                 </button>
                 
@@ -1040,7 +1055,7 @@
                 <div id="ai-insight-box" class="ai-output-box min-h-[50px] text-gray-800">
                     Your custom guidance will appear here after clicking a button above.
                 </div>
-                <button id="copy-ai-btn" onclick="copyAIOutput()" class="mt-3 bg-[#ccac00] text-white hover:bg-[#a98d00] font-bold py-2 px-4 rounded-lg text-sm transition duration-150 hidden">
+                <button id="copy-ai-btn" onclick="copyAIOutput()" class="mt-3 bg-[#e4c756] text-white hover:bg-[#c2a74c] font-bold py-2 px-4 rounded-lg text-sm transition duration-150 hidden">
                     COPY PRAYER / INSIGHT TEXT
                 </button>
             </div>
@@ -1051,7 +1066,7 @@
             <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Journal History & Export</h2>
             <p class="text-sm text-gray-600 mb-4">View and export all your past reflections for scrapbooking or deeper review.</p>
             
-            <div class="grid grid-cols-3 gap-2 mb-4">
+            <div class="filter-grid mb-4">
                 <input type="date" id="filter-start-date" class="p-2 border rounded-lg text-sm" placeholder="Start Date">
                 <input type="date" id="filter-end-date" class="p-2 border rounded-lg text-sm" placeholder="End Date">
                 <input type="number" id="filter-limit" class="p-2 border rounded-lg text-sm" placeholder="Limit (e.g., 5)">
