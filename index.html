@@ -186,7 +186,7 @@
 
         // --- AUTHENTICATION STATE TRACKING ---
         let isAuthenticated = false;
-
+        let lastLoadedDate = null; // Used to track if midnight has passed
 
         // --- FIREBASE INITIALIZATION AND AUTHENTICATION ---
         async function initializeFirebase() {
@@ -306,6 +306,18 @@
             onSnapshot(docRef, (docSnap) => {
                 const data = docSnap.exists() ? docSnap.data() : {};
                 
+                // --- DATA CLEARANCE LOGIC (The Fix) ---
+                if (data.lastLoadedDate && data.lastLoadedDate !== todayKey) {
+                    // Midnight has passed: Clear the journal boxes and save the new load date
+                    document.getElementById('dream-log').value = '';
+                    document.getElementById('journal-log').value = '';
+                    setDoc(docRef, { lastLoadedDate: todayKey }, { merge: true });
+                    displayMessage('New Day started! Journal cleared.', 'success');
+                } else if (!data.lastLoadedDate) {
+                     // First time loading for this user/day: set the load date
+                    setDoc(docRef, { lastLoadedDate: todayKey }, { merge: true });
+                }
+                
                 // 1. Update Checkboxes
                 Object.keys(disciplines).forEach(id => {
                     const field = disciplines[id];
@@ -326,9 +338,13 @@
                     }
                 });
 
-                // 2. Update Long Text Areas
-                document.getElementById('dream-log').value = data.DreamLog || '';
-                document.getElementById('journal-log').value = data.JournalLog || '';
+                // 2. Update Long Text Areas (Load existing data if available)
+                if (document.getElementById('dream-log').value === '') {
+                    document.getElementById('dream-log').value = data.DreamLog || '';
+                }
+                if (document.getElementById('journal-log').value === '') {
+                    document.getElementById('journal-log').value = data.JournalLog || '';
+                }
 
                 // 3. Update Streak Display 
                 document.getElementById('streak-count').textContent = data.streak || 0; 
@@ -375,6 +391,7 @@
             
             const updates = {
                 [dataField]: text,
+                lastLoadedDate: todayKey, // Ensure the date is marked when saving text
                 lastUpdated: new Date().toISOString()
             };
 
@@ -607,369 +624,4 @@
         async function fetchGemini(prompt, systemInstruction = null) {
             if (!savedApiKey) {
                 const errorMessage = "AI Key Missing. Please set your Gemini API Key in the configuration card above.";
-                document.getElementById('ai-insight-box').textContent = errorMessage;
-                displayMessage(errorMessage, 'error');
-                return null;
-            }
-            
-            const fullUrl = `${GEMINI_API_URL}${savedApiKey}`;
-            const aiInsightBox = document.getElementById('ai-insight-box');
-            
-            aiInsightBox.textContent = "Generating insight... please wait.";
-            document.getElementById('copy-ai-btn').style.display = 'none';
-
-
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
-                // The config block is intentionally omitted for compatibility
-            };
-
-            const maxRetries = 3;
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const response = await fetch(fullUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        const result = await response.json();
-                        return result.candidates?.[0]?.content?.parts?.[0]?.text || "AI failed to generate content.";
-                    } else if (response.status === 400 || response.status === 403) {
-                         // --- GRACEFUL ERROR PARSING START ---
-                         let userError = `API Key rejected (Status: ${response.status}).`;
-                         try {
-                             const errorBody = await response.json();
-                             userError = errorBody.error?.message || userError;
-                         } catch (e) {
-                             // If it's not JSON (like a simple HTML server error), handle gracefully
-                             console.warn("Non-JSON API Error Response (Likely Key Failure):", await response.text());
-                         }
-                         
-                         displayMessage(`Error: ${userError}`, 'error');
-                         return `Key Error: The API key is invalid or your usage limits may have been exceeded. Please re-enter a new key.`;
-                    }
-                     else {
-                        const errorBody = await response.text();
-                        console.error(`API Error: ${response.status} - ${errorBody}`);
-                        throw new Error(`API returned status ${response.status}`);
-                    }
-                } catch (error) {
-                    console.error(`Attempt ${i + 1} failed:`, error);
-                    if (i < maxRetries - 1) {
-                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-                    } else {
-                        return "Error: AI service is currently unavailable after multiple retries. Check API Key validity.";
-                    }
-                }
-            }
-        }
-
-        function updateAIOutput(text) {
-            document.getElementById('ai-insight-box').textContent = text;
-            document.getElementById('copy-ai-btn').style.display = 'block';
-        }
-
-        // --- AI ACTION FUNCTIONS ---
-
-        async function handleGeneratePrayer() {
-            const prayerStyle = document.getElementById('prayer-style-selector').value;
-            const topic = document.getElementById('ai-topic').value.trim().replace(/['"]+/g, '') || 'my new life in Christ';
-
-            let prompt;
-            let systemInstruction;
-
-            if (prayerStyle === 'prophetic') {
-                prompt = `Start the prayer with a full paragraph dedicated to praising God for His character and thanking Him for His grace, love, and provision. Use declarative and faith-filled language. Then, generate the prayer body focusing on the topic: "${topic}". The prayer must include strong, declarative phrases like 'I decree,' 'I declare,' 'I bind,' and 'I loose.' The prayer must be grounded in Scripture and must weave in 1-3 relevant Bible verses cited using declarative phrases like 'as it says in Philippians 4:6' directly into the text. The prayer should be focused on grace and end with the declaration: 'in Jesus' mighty name, Amen.'`;
-                systemInstruction = "You are a Christian spiritual warfare expert. Your output must be a bold, faith-filled declaration suitable for reading aloud and centered on God's grace.";
-            } else { // Breakthrough/Clarice Fluitt style
-                prompt = `Start the prayer with a full paragraph dedicated to praising God for His character and thanking Him for His grace, love, and provision. Use declarative and faith-filled language. Then, generate the prayer body focusing on the topic: "${topic}". The prayer should be bold, filled with hope, encourage stepping out in faith. The prayer must be grounded in Scripture and must weave in 1-3 relevant Bible verses cited using declarative phrases like 'as it says in Philippians 4:6' directly into the text. End with the declaration: 'in Jesus' mighty name, Amen.'`;
-                systemInstruction = "You are an anointed, bold, and encouraging Christian intercessor focused on grace and breakthrough. Your output must be a powerful, heartfelt prayer.";
-            }
-
-            const prayerText = await fetchGemini(prompt, systemInstruction);
-            if (prayerText) updateAIOutput(prayerText);
-        }
-
-        async function analyzeJournal() {
-            const journalText = document.getElementById('journal-log').value.trim();
-            const dreamText = document.getElementById('dream-log').value.trim();
-
-            if (!journalText && !dreamText) {
-                updateAIOutput("Please write some content in your Journal or Dream Log before analyzing.");
-                return;
-            }
-
-            document.getElementById('copy-ai-btn').style.display = 'none';
-
-            const combinedText = `Morning Reflection: "${journalText}" \n\n Dream/Vision: "${dreamText}"`;
-
-            const prompt = `Analyze the following combined journal entries and dreams. Identify the underlying struggles (e.g., financial worry, self-doubt, decision fatigue, loneliness) and any revealed desires. Based on this analysis, generate a list of 3-5 specific, actionable PRAYER POINTS framed as intercession. Do not offer direct advice; only structure the prayer points. Each prayer point MUST be grounded in Scripture and cite one relevant Bible verse in parentheses (e.g., Romans 8:28).`;
-            
-            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a list of 3-5 specific PRAYER POINTS derived directly from the user's emotional struggles and needs, formatted clearly with bullet points. Do not offer suggestions; only frame the action as an invitation to prayer.`;
-
-            const insightText = await fetchGemini(prompt, systemInstruction);
-            if (insightText) updateAIOutput(insightText);
-        }
-
-        async function summarizeScripture() {
-            const passage = document.getElementById('ai-topic').value.trim().replace(/['"]+/g, '');
-            if (!passage) {
-                updateAIOutput("Please enter a Scripture reference (e.g., John 3:16) to summarize.");
-                return;
-            }
-
-            document.getElementById('copy-ai-btn').style.display = 'none';
-
-            const prompt = `Summarize the core truth and grace-centered meaning of the Scripture passage: "${passage}" in one short paragraph. Then, provide one specific, simple action step for a new Christian to apply this truth today.`;
-            
-            const systemInstruction = "You are a Christian Bible teacher. Your summary must be clear, focused on the gospel of grace, and easy for a new believer to understand. Output the summary, then the action step.";
-
-            const summaryText = await fetchGemini(prompt, systemInstruction);
-            if (summaryText) updateAIOutput(summaryText);
-        }
-        
-        function copyAIOutput() {
-            const textToCopy = document.getElementById('ai-insight-box').textContent;
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                displayMessage('Copied to Clipboard!');
-            }).catch(err => {
-                console.error('Could not copy text: ', err);
-                displayMessage('Error copying text.', 'error');
-            });
-        }
-
-
-        // --- EVENT LISTENERS AND INITIAL LOAD ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeFirebase();
-            checkApiKeyStatus(); // Check API status immediately
-            document.getElementById('timer-btn').addEventListener('click', startTimer);
-            document.getElementById('save-api-key-btn').addEventListener('click', saveApiKey);
-            document.getElementById('verify-key-btn').addEventListener('click', displaySavedKey); // Debug button
-            document.getElementById('reconnect-btn').addEventListener('click', reconnectSession); // Manual reconnect button
-            
-            // Wire up speech-to-text buttons
-            document.getElementById('mic-dream-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                toggleSpeech('dream-log', e.currentTarget);
-            });
-            document.getElementById('mic-journal-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                toggleSpeech('journal-log', e.currentTarget);
-            });
-            document.getElementById('mic-topic-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                toggleSpeech('ai-topic', e.currentTarget);
-            });
-
-            // Wire up checklist boxes
-            Object.keys(disciplines).forEach(id => {
-                const checkbox = document.getElementById(id);
-                if (checkbox) {
-                    checkbox.addEventListener('change', toggleDiscipline);
-                }
-            });
-            
-            // Wire up text area save buttons
-            document.getElementById('save-dream-btn').addEventListener('click', () => saveLongText('dream-log', 'DreamLog', 'discipline-dream'));
-            document.getElementById('save-journal-btn').addEventListener('click', () => saveLongText('journal-log', 'JournalLog', 'discipline-journal'));
-            
-            // Wire up AI buttons
-            document.getElementById('generate-prayer-btn').addEventListener('click', handleGeneratePrayer);
-            document.getElementById('summarize-scripture-btn').addEventListener('click', summarizeScripture);
-            document.getElementById('analyze-journal-btn').addEventListener('click', analyzeJournal);
-            document.getElementById('copy-ai-btn').addEventListener('click', copyAIOutput);
-            
-            // Wire up history button
-            document.getElementById('load-history-btn').addEventListener('click', loadJournalHistory);
-            document.getElementById('copy-history-btn').addEventListener('click', copyAllHistoryText);
-        });
-    </script>
-</head>
-
-<body class="bg-gray-100">
-    <div id="loading-screen" class="loading-screen">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#008080]"></div>
-        <p class="mt-4 text-lg text-[#008080]">Loading Anchor...</p>
-    </div>
-
-    <div class="container">
-        <!-- API KEY CONFIGURATION (CRITICAL) -->
-        <div class="card bg-yellow-50" style="background-color: #fcfcf0; border: 1px dashed #ccac00;">
-            <h2 class="text-xl font-bold text-[#ccac00] mb-3">🛠️ AI Key Configuration (Required)</h2>
-            <p class="text-sm text-gray-700 mb-2">The AI features need a **Gemini API Key** to run. Please ensure your key is valid and re-enter it if necessary.</p>
-            <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 underline">Click here to get your free Gemini API Key</a>
-            
-            <input id="api-key-input" type="password" placeholder="Paste your API Key here..." class="w-full border border-gray-300 p-2 rounded-lg mt-3 focus:ring-[#ccac00] focus:focus:border-[#ccac00]">
-            
-            <div class="flex space-x-2 mt-2">
-                <button id="save-api-key-btn" class="flex-1 bg-[#ccac00] hover:bg-[#a98d00] text-white font-bold py-2 rounded-lg transition duration-150 text-sm">
-                    SAVE KEY & ENABLE AI
-                </button>
-                <button id="verify-key-btn" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 rounded-lg transition duration-150 text-sm">
-                    VERIFY SAVED KEY
-                </button>
-            </div>
-            <p id="api-status" class="mt-2 text-sm font-semibold text-red-500">Status: Key Required.</p>
-        </div>
-
-
-        <!-- HEADER AND DASHBOARD -->
-        <div class="card color-teal text-white p-4" style="background-color: #008080;">
-            <div class="header-content">
-                <h1 class="text-xl font-bold">The Morning Anchor Checklist</h1>
-                <p id="user-id" class="text-sm">Session: Disconnected</p>
-                <p id="today-date" class="text-sm font-semibold">Date: Loading...</p>
-            </div>
-            <div class="mt-2 streak-box">
-                <div class="text-center flex flex-col items-center">
-                    <span class="text-sm font-medium">Consecutive Streak:</span>
-                    <span id="streak-count" class="text-4xl font-extrabold text-white leading-none">0</span>
-                </div>
-            </div>
-            <button id="reconnect-btn" class="mt-3 w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
-                RECONNECT / SIGN IN
-            </button>
-        </div>
-
-        <!-- 1-MINUTE READ TIMER -->
-        <div class="card text-center">
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">1. READ: Anchor Minute</h2>
-            <div id="timer-display" class="timer-display text-[#008080] mb-4">01:00</div>
-            <button id="timer-btn" class="w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-3 px-4 rounded-lg transition duration-150 ease-in-out disabled:opacity-50">
-                START 1-MINUTE READ
-            </button>
-        </div>
-
-        <!-- DAILY DISCIPLINES CHECKLIST -->
-        <div class="card">
-            <h2 class="text-xl font-bold text-[#008080] mb-3">Your Daily Disciplines</h2>
-            <div class="space-y-1">
-                <div class="discipline-item">
-                    <label class="text-gray-700 font-medium" for="discipline-pray">🙏 1. PRAY (Conversation)</label>
-                    <input type="checkbox" id="discipline-pray" data-field="Pray" class="h-5 w-5 text-[#008080] rounded">
-                </div>
-                <div class="discipline-item">
-                    <label class="text-gray-700 font-medium" for="discipline-read">📖 2. READ (The Word)</label>
-                    <input type="checkbox" id="discipline-read" data-field="Read" class="h-5 w-5 text-[#008080] rounded">
-                </div>
-                <div class="discipline-item">
-                    <label class="text-gray-700 font-medium" for="discipline-learn">💡 3. LEARN (Teaching/Sermon)</label>
-                    <input type="checkbox" id="discipline-learn" data-field="Learn" class="h-5 w-5 text-[#008080] rounded">
-                </div>
-                <div class="discipline-item">
-                    <label class="text-gray-700 font-medium" for="discipline-wellness">🏃‍♀️ 4. WELLNESS (Body as Temple)</label>
-                    <input type="checkbox" id="discipline-wellness" data-field="Wellness" class="h-5 w-5 text-[#008080] rounded">
-                </div>
-                <div class="discipline-item">
-                    <label class="text-gray-700 font-medium" for="discipline-dream">✨ 5. DREAM/VISION LOGGED</label>
-                    <input type="checkbox" id="discipline-dream" data-field="Dream" class="h-5 w-5 text-[#008080] rounded">
-                </div>
-                <div class="discipline-item">
-                    <label class="text-gray-700 font-medium" for="discipline-journal">✍️ 6. JOURNAL ENTRY MADE</label>
-                    <input type="checkbox" id="discipline-journal" data-field="Journal" class="h-5 w-5 text-[#008080] rounded">
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. DREAM, VISION, & KNOWLEDGE LOG -->
-        <div class="card bg-purple-50" style="background-color: #fcfcf0; border: 1px solid #008080;">
-            <h2 class="text-xl font-bold text-[#008080] mb-3">Dream, Vision, & Knowledge Log</h2>
-            <div class="journal-header mb-3">
-                <p class="text-sm text-gray-700">Record insights, dreams, or revelations received from God.</p>
-                <button id="mic-dream-btn" class="mic-btn" title="Start Voice Input">🎤</button>
-            </div>
-            <textarea id="dream-log" rows="6" class="w-full border border-[#008080] p-3 rounded-lg focus:ring-[#008080] focus:border-[#008080] bg-white" placeholder="Speak or type your dreams and knowledge here..."></textarea>
-            <button id="save-dream-btn" class="mt-2 w-full bg-[#008080] hover:bg-teal-700 text-white font-bold py-2 rounded-lg transition duration-150">
-                SAVE DREAM/VISION LOG (Auto-Checks Box)
-            </button>
-        </div>
-
-        <!-- 6. MORNING REFLECTION JOURNAL -->
-        <div class="card bg-blue-50" style="background-color: #fcfcf0; border: 1px solid #ffb6c1;">
-            <h2 class="text-xl font-bold text-[#008080] mb-3">Morning Reflection Journal</h2>
-            <div class="journal-header mb-3">
-                <p class="text-sm text-gray-700">General thoughts, gratitude, or detailed reflections.</p>
-                <button id="mic-journal-btn" class="mic-btn" title="Start Voice Input">🎤</button>
-            </div>
-            <textarea id="journal-log" rows="6" class="w-full border border-[#ffb6c1] p-3 rounded-lg focus:ring-[#ffb6c1] focus:border-[#ffb6c1] bg-white" placeholder="Speak or type your general reflection here..."></textarea>
-            <button id="save-journal-btn" class="mt-2 w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
-                SAVE REFLECTION JOURNAL (Auto-Checks Box)
-            </button>
-        </div>
-
-        <!-- GEMINI AI GUIDANCE TOOLS -->
-        <div class="card bg-gray-50" style="background-color: #fcfcf0;">
-            <h2 class="text-xl font-bold text-[#008080] mb-3">✨ Spiritual Insight Tools (Gemini AI)</h2>
-            
-            <p class="text-sm text-gray-700 mb-4 font-semibold border-b pb-2">
-                *How to Use:* Enter a Scripture reference (e.g., John 3:16) or a Prayer Topic (e.g., Anxiety) below. Then, use the buttons for guidance.
-            </p>
-
-            <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:focus:border-[#ccac00]">
-                <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
-            </div>
-            
-            <div class="flex flex-col space-y-4">
-                
-                <!-- 1. PRAYER GENERATOR -->
-                <div class="border-b pb-4 border-[#ffb6c1]">
-                    <select id="prayer-style-selector" class="w-full p-2 border border-gray-300 rounded-lg mb-2 bg-white text-gray-700">
-                        <option value="intercession">Intercessory Prayer (Breakthrough/Encouragement Style)</option>
-                        <option value="prophetic">Prophetic Decree (Declarative/Amanda Grace Style)</option>
-                    </select>
-                    <button id="generate-prayer-btn" class="w-full bg-[#008080] hover:bg-teal-700 text-white font-bold py-2 rounded-lg transition duration-150">
-                        GENERATE 1-MINUTE MORNING PRAYER
-                    </button>
-                </div>
-                
-                <!-- 2. SCRIPTURE SUMMARIZER -->
-                <button id="summarize-scripture-btn" class="w-full bg-[#ccac00] hover:bg-[#a98d00] text-white font-bold py-2 rounded-lg transition duration-150">
-                    SUMMARIZE SCRIPTURE (Grace Insight)
-                </button>
-                
-                <!-- 3. JOURNAL ANALYZER -->
-                <button id="analyze-journal-btn" class="w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
-                    ANALYZE JOURNAL & GENERATE PRAYER POINTS
-                </button>
-            </div>
-
-            <!-- AI OUTPUT SECTION -->
-            <div class="mt-6">
-                <p class="text-md font-bold text-[#2c3e50]">AI Insight Box:</p>
-                <div id="ai-insight-box" class="ai-output-box min-h-[50px] text-gray-800">
-                    Your custom guidance will appear here after clicking a button above.
-                </div>
-                <button id="copy-ai-btn" onclick="copyAIOutput()" class="mt-3 bg-[#ccac00] text-white hover:bg-[#a98d00] font-bold py-2 px-4 rounded-lg text-sm transition duration-150 hidden">
-                    COPY PRAYER / INSIGHT TEXT
-                </button>
-            </div>
-        </div>
-
-        <!-- JOURNAL HISTORY SECTION -->
-        <div class="card bg-gray-50" style="background-color: #fcfcf0;">
-            <h2 class="text-xl font-bold text-[#008080] mb-3">Journal History & Export</h2>
-            <p class="text-sm text-gray-600 mb-4">View and export all your past reflections for scrapbooking or deeper review.</p>
-            
-            <button id="load-history-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 rounded-lg transition duration-150 mb-4">
-                Load Full Journal History
-            </button>
-            
-            <div id="history-output" class="text-sm text-gray-700 border border-gray-300 p-3 rounded-lg bg-white min-h-[50px]">
-                Click 'Load Full Journal History' to retrieve past entries.
-            </div>
-
-            <button id="copy-history-btn" class="mt-3 w-full bg-[#008080] hover:bg-teal-700 text-white font-bold py-2 rounded-lg transition duration-150 hidden">
-                Copy All History Text (for Scrapbook)
-            </button>
-        </div>
-    </div>
-
-    <!-- STATUS MESSAGE -->
-    <div id="status-message" class="status-message hidden"></div>
-</body>
-</html>
+                document.getElementById('ai-insight-box
