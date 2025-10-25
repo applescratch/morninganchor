@@ -191,10 +191,9 @@
         // --- FIREBASE INITIALIZATION AND AUTHENTICATION ---
         async function initializeFirebase() {
             try {
-                // Initialize app with your correct config
                 const app = initializeApp(FIREBASE_CONFIG);
                 db = getFirestore(app);
-                auth = getAuth(app); // Ensure getAuth works with the app object
+                auth = getAuth(app); 
                 
                 // Set up listener to manage session state globally
                 onAuthStateChanged(auth, (user) => {
@@ -217,7 +216,7 @@
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
                     if (document.getElementById('loading-screen').style.opacity !== '0') {
-                        displayMessage('Connection timeout. Please check console for Firebase config errors.', 'error');
+                        displayMessage('Connection timeout. Please check console for configuration errors.', 'error');
                         hideLoading();
                     }
                 }, 5000); // Guarantees loading screen closes after 5s
@@ -269,6 +268,8 @@
                 document.getElementById('api-status').classList.remove('text-red-500');
                 document.getElementById('api-status').classList.add('text-[#008080]');
                 displayMessage('API Key Saved Successfully! AI is now active.');
+                // Hide card on successful save
+                document.getElementById('api-config-card').classList.add('hidden');
             } else {
                 displayMessage('Please enter a valid Gemini API Key (starts with AIza).', 'error');
             }
@@ -294,6 +295,19 @@
                 document.getElementById('api-status').textContent = `Loaded Key: ${partialKey}...`;
             } else {
                 document.getElementById('api-status').textContent = "No key found in browser storage.";
+            }
+        }
+        
+        function toggleApiConfig() {
+            const card = document.getElementById('api-config-card');
+            const toggleButton = document.getElementById('toggle-api-btn');
+            
+            if (card.classList.contains('hidden')) {
+                card.classList.remove('hidden');
+                toggleButton.textContent = 'Hide Key Config';
+            } else {
+                card.classList.add('hidden');
+                toggleButton.textContent = 'Show Key Config';
             }
         }
 
@@ -441,26 +455,64 @@
                 }
                 
                 let historyHTML = '';
+                const historyEntries = [];
+
                 querySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const date = doc.id;
+                    historyEntries.push({ id: doc.id, data: doc.data() });
+                });
+
+                // Sort by date (id) descending (newest first)
+                historyEntries.sort((a, b) => b.id.localeCompare(a.id));
+
+                // --- APPLY FILTERS ---
+                const filterStartDate = document.getElementById('filter-start-date').value;
+                const filterEndDate = document.getElementById('filter-end-date').value;
+                const filterKeyword = document.getElementById('filter-keyword').value.toLowerCase().trim();
+                const filterLimit = parseInt(document.getElementById('filter-limit').value) || 0;
+
+                let filteredEntries = historyEntries.filter(entry => {
+                    const entryDate = entry.id;
+                    const combinedText = (entry.data.JournalLog || '') + (entry.data.DreamLog || '');
                     
+                    // 1. Date Range Filter
+                    const dateMatch = (!filterStartDate || entryDate >= filterStartDate) && 
+                                      (!filterEndDate || entryDate <= filterEndDate);
+                    
+                    // 2. Keyword Filter
+                    const keywordMatch = !filterKeyword || combinedText.toLowerCase().includes(filterKeyword);
+                    
+                    return dateMatch && keywordMatch;
+                });
+                
+                // 3. Apply Limit
+                if (filterLimit > 0) {
+                    filteredEntries = filteredEntries.slice(0, filterLimit);
+                }
+                
+                if (filteredEntries.length === 0) {
+                     document.getElementById('history-output').innerHTML = '<p class="text-gray-500">No entries matched your filters.</p>';
+                     return;
+                }
+
+                filteredEntries.forEach(entry => {
+                    const date = entry.id;
+                    const data = entry.data;
+
                     const reflection = data.JournalLog ? `**Reflection:** ${data.JournalLog.substring(0, 150)}...` : '';
                     const dream = data.DreamLog ? `**Dream/Vision:** ${data.DreamLog.substring(0, 150)}...` : '';
                     
-                    if (reflection || dream) {
-                        historyHTML += `
-                            <div class="history-entry">
-                                <p class="font-bold text-lg text-teal-700">${date}</p>
-                                ${reflection ? `<p class="mt-1 text-sm">${reflection}</p>` : ''}
-                                ${dream ? `<p class="mt-1 text-sm">${dream}</p>` : ''}
-                            </div>
-                        `;
-                    }
+                    historyHTML += `
+                        <div class="history-entry">
+                            <p class="font-bold text-lg text-teal-700">${date}</p>
+                            ${reflection ? `<p class="mt-1 text-sm">${reflection}</p>` : ''}
+                            ${dream ? `<p class="mt-1 text-sm">${dream}</p>` : ''}
+                        </div>
+                    `;
                 });
                 
                 document.getElementById('history-output').innerHTML = historyHTML;
                 document.getElementById('copy-history-btn').style.display = 'block';
+
             } catch (e) {
                 console.error("History load error:", e);
                  document.getElementById('history-output').innerHTML = `<p class="text-red-500">Error: Could not load history. Please ensure you are signed in and have set security rules.</p>`;
@@ -468,6 +520,8 @@
         }
 
         async function copyAllHistoryText() {
+            // This function should ideally use the same filtering logic as loadJournalHistory
+            // For simplicity, we will copy the full, unfiltered text here for now.
             const q = query(getCollectionRef(userId));
             const querySnapshot = await getDocs(q);
             
@@ -703,7 +757,10 @@
             if (prayerStyle === 'prophetic') {
                 prompt = `Start the prayer with a full paragraph dedicated to praising God for His character and thanking Him for His grace, love, and provision. Use declarative and faith-filled language. Then, generate the prayer body focusing on the topic: "${topic}". The prayer must include strong, declarative phrases like 'I decree,' 'I declare,' 'I bind,' and 'I loose.' The prayer must be grounded in Scripture and must weave in 1-3 relevant Bible verses cited using declarative phrases like 'as it says in Philippians 4:6' directly into the text. The prayer should be focused on grace and end with the declaration: 'in Jesus' mighty name, Amen.'`;
                 systemInstruction = "You are a Christian spiritual warfare expert. Your output must be a bold, faith-filled declaration suitable for reading aloud and centered on God's grace.";
-            } else { // Breakthrough/Clarice Fluitt style
+            } else if (prayerStyle === 'quick') {
+                prompt = `Generate a concise prayer (60-80 words max) focused on the topic: "${topic}". The prayer must include 1-2 powerful sentences of praise and thanksgiving, followed by a simple request. The prayer must be grounded in Scripture and include one relevant Bible verse cited using declarative phrases like 'as it says in Philippians 4:6' directly into the text. End with the declaration: 'in Jesus' mighty name, Amen.'`;
+                systemInstruction = "You are a devotional assistant. Your output must be short, sweet, and focused on maintaining daily spiritual consistency and grace.";
+            } else { // Breakthrough/Clarice Fluitt style (default intercessory)
                 prompt = `Start the prayer with a full paragraph dedicated to praising God for His character and thanking Him for His grace, love, and provision. Use declarative and faith-filled language. Then, generate the prayer body focusing on the topic: "${topic}". The prayer should be bold, filled with hope, encourage stepping out in faith. The prayer must be grounded in Scripture and must weave in 1-3 relevant Bible verses cited using declarative phrases like 'as it says in Philippians 4:6' directly into the text. End with the declaration: 'in Jesus' mighty name, Amen.'`;
                 systemInstruction = "You are an anointed, bold, and encouraging Christian intercessor focused on grace and breakthrough. Your output must be a powerful, heartfelt prayer.";
             }
@@ -725,9 +782,9 @@
 
             const combinedText = `Morning Reflection: "${journalText}" \n\n Dream/Vision: "${dreamText}"`;
 
-            const prompt = `Analyze the following combined journal entries and dreams. Identify the underlying struggles (e.g., financial worry, self-doubt, decision fatigue, loneliness) and any revealed desires. Based on this analysis, generate a list of 3-5 specific, actionable PRAYER POINTS framed as intercession. Do not offer direct advice; only structure the prayer points. Each prayer point MUST be grounded in Scripture and cite one relevant Bible verse in parentheses (e.g., Romans 8:28).`;
+            const prompt = `Analyze the following combined journal entries and dreams. Identify the underlying struggles (e.g., financial worry, self-doubt, loneliness) and emotional tone (e.g., striving, gratitude). Based on this, generate a list of 3-5 specific, actionable PRAYER POINTS. Each point MUST be grounded in Scripture and cite one relevant Bible verse in parentheses (e.g., Romans 8:28). The tone must be gentle and encouraging.`;
             
-            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a list of 3-5 specific PRAYER POINTS derived directly from the user's emotional struggles and needs, formatted clearly with bullet points. Do not offer suggestions; only frame the action as an invitation to prayer.`;
+            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a structured report with these exact sections: 1. ✨ YOUR HEART FOCUS (1-2 sentence summary of their emotional tone and posture toward grace), 2. 🙏 PRAYER POINTS & BREAKTHROUGH (3-5 bulleted prayer points), and 3. 📖 SCRIPTURE FOR DEEPER STUDY (1-2 verses cited). Do not offer advice; only frame the action as an invitation to prayer and study.`;
 
             const insightText = await fetchGemini(prompt, systemInstruction);
             if (insightText) updateAIOutput(insightText);
@@ -783,6 +840,8 @@
                 e.preventDefault();
                 toggleSpeech('ai-topic', e.currentTarget);
             });
+            document.getElementById('toggle-api-btn').addEventListener('click', toggleApiConfig);
+
 
             // Wire up checklist boxes
             Object.keys(disciplines).forEach(id => {
@@ -817,7 +876,7 @@
 
     <div class="container">
         <!-- API KEY CONFIGURATION (CRITICAL) -->
-        <div class="card bg-yellow-50" style="background-color: #fcfcf0; border: 1px dashed #ccac00;">
+        <div id="api-config-card" class="card bg-yellow-50" style="background-color: #fcfcf0; border: 1px dashed #ccac00;">
             <h2 class="text-xl font-bold text-[#ccac00] mb-3">🛠️ AI Key Configuration (Required)</h2>
             <p class="text-sm text-gray-700 mb-2">The AI features need a **Gemini API Key** to run. Please ensure your key is valid and re-enter it if necessary.</p>
             <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 underline">Click here to get your free Gemini API Key</a>
@@ -833,6 +892,9 @@
                 </button>
             </div>
             <p id="api-status" class="mt-2 text-sm font-semibold text-red-500">Status: Key Required.</p>
+        </div>
+        <div class="flex justify-end mb-4">
+             <button id="toggle-api-btn" onclick="toggleApiConfig()" class="text-sm text-gray-600 hover:text-[#008080] font-medium">Hide Key Config</button>
         </div>
 
 
@@ -943,7 +1005,7 @@
             </p>
 
             <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:focus:border-[#ccac00]">
+                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:border-[#ccac00]">
                 <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
             </div>
             
@@ -989,12 +1051,19 @@
             <h2 class="text-xl font-bold text-[#008080] mb-3">Journal History & Export</h2>
             <p class="text-sm text-gray-600 mb-4">View and export all your past reflections for scrapbooking or deeper review.</p>
             
+            <div class="grid grid-cols-3 gap-2 mb-4">
+                <input type="date" id="filter-start-date" class="p-2 border rounded-lg text-sm" placeholder="Start Date">
+                <input type="date" id="filter-end-date" class="p-2 border rounded-lg text-sm" placeholder="End Date">
+                <input type="number" id="filter-limit" class="p-2 border rounded-lg text-sm" placeholder="Limit (e.g., 5)">
+            </div>
+            <input type="text" id="filter-keyword" class="w-full p-2 border rounded-lg text-sm mb-4" placeholder="Search by Keyword (e.g., 'chocolate' or 'doubt')">
+
             <button id="load-history-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 rounded-lg transition duration-150 mb-4">
-                Load Full Journal History
+                LOAD FILTERED JOURNAL HISTORY
             </button>
             
             <div id="history-output" class="text-sm text-gray-700 border border-gray-300 p-3 rounded-lg bg-white min-h-[50px]">
-                Click 'Load Full Journal History' to retrieve past entries.
+                Click 'LOAD FILTERED JOURNAL HISTORY' to retrieve past entries.
             </div>
 
             <button id="copy-history-btn" class="mt-3 w-full bg-[#008080] hover:bg-teal-700 text-white font-bold py-2 rounded-lg transition duration-150 hidden">
