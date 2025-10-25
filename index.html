@@ -35,8 +35,8 @@
             border-bottom: none;
         }
         /* Custom Colors */
-        .color-mint { background-color: #98FB98; } /* Mint Green */
-        .color-pink { background-color: #ffb6c1; } /* Light Pink */
+        .color-mint { background-color: #b5e5cf; } /* Mint Green */
+        .color-pink { background-color: #fcb5ac; } /* Light Pink */
         .color-gold { color: #ccac00; } /* Gold Text */
         
         .status-message {
@@ -44,7 +44,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background-color: #ffb6c1; /* Soft Pink for status */
+            background-color: #fcb5ac; /* Soft Pink for status */
             color: #2c3e50;
             padding: 12px;
             text-align: center;
@@ -68,7 +68,7 @@
         .timer-display {
             font-size: 2.8rem;
             font-weight: 800;
-            color: #98FB98; /* Mint */
+            color: #b5e5cf; /* Mint */
         }
         .ai-output-box {
             background-color: #fcfcf0; /* Cream background */
@@ -88,7 +88,7 @@
         .mic-btn {
             background-color: transparent;
             border: none;
-            color: #ffb6c1; /* Soft Pink */
+            color: #fcb5ac; /* Soft Pink */
             font-size: 1.5rem;
             cursor: pointer;
             margin-left: 10px;
@@ -204,7 +204,7 @@
                         isAuthenticated = true;
                         // Display status using user's name/email/ID
                         document.getElementById('user-id').textContent = `Session: Connected (${user.displayName || user.email || 'ID: ' + userId.substring(0, 8)}...)`;
-                        document.getElementById('user-id').style.color = '#ffb6c1'; // Soft Pink for connected state
+                        document.getElementById('user-id').style.color = '#fcb5ac'; // Soft Pink for connected state
                         loadDailyData();
                     } else {
                         userId = null;
@@ -268,7 +268,7 @@
                 savedApiKey = inputKey;
                 document.getElementById('api-status').textContent = 'Key Saved! AI features enabled.';
                 document.getElementById('api-status').classList.remove('text-red-500');
-                document.getElementById('api-status').classList.add('text-[#008080]');
+                document.getElementById('api-status').classList.add('text-[#98FB98]');
                 displayMessage('API Key Saved Successfully! AI is now active.');
                 // Hide card on successful save
                 document.getElementById('api-config-card').classList.add('hidden');
@@ -282,11 +282,11 @@
             if (savedApiKey) {
                 statusElement.textContent = 'Key Active. AI features enabled.';
                 statusElement.classList.remove('text-red-500');
-                statusElement.classList.add('text-[#008080]');
+                statusElement.classList.add('text-[#98FB98]');
                 document.getElementById('api-key-input').value = savedApiKey.substring(0, 5) + '...';
             } else {
                 statusElement.textContent = 'Key Required. AI features disabled.';
-                statusElement.classList.remove('text-[#008080]');
+                statusElement.classList.remove('text-[#98FB98]');
                 statusElement.classList.add('text-red-500');
             }
         }
@@ -548,7 +548,7 @@
         function displayMessage(message, type = 'success') {
             const msgElement = document.getElementById('status-message');
             msgElement.textContent = message;
-            msgElement.className = `status-message ${type === 'success' ? 'bg-[#ffb6c1]' : 'bg-red-600'} text-[#2c3e50]`;
+            msgElement.className = `status-message ${type === 'success' ? 'bg-[#fcb5ac]' : 'bg-red-600'} text-[#2c3e50]`;
             clearTimeout(msgElement.timeout);
             msgElement.timeout = setTimeout(() => {
                 msgElement.textContent = '';
@@ -784,7 +784,7 @@
 
             const prompt = `Analyze the following combined journal entries and dreams. Identify the underlying struggles (e.g., financial worry, self-doubt, loneliness) and emotional tone (e.g., striving, gratitude). Based on this analysis, generate a list of 3-5 specific, actionable PRAYER POINTS. Do not offer direct advice; only structure the prayer points. Each prayer point MUST be grounded in Scripture and cite one relevant Bible verse in parentheses (e.g., Romans 8:28).`;
             
-            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a structured report with these exact sections: 1. ✨ YOUR HEART FOCUS (1-2 sentence summary of their emotional tone and posture toward grace), 2. 🙏 PRAYER POINTS & BREAKTHROUGH (3-5 bulleted prayer points), and 3. 📖 SCRIPTURE FOR DEEPER STUDY (1-2 verses cited). Do not offer suggestions; only frame the action as an an invitation to prayer and study.`;
+            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a structured report with these exact sections: 1. ✨ YOUR HEART FOCUS (1-2 sentence summary of their emotional tone and posture toward grace), 2. 🙏 PRAYER POINTS & BREAKTHROUGH (3-5 bulleted prayer points), and 3. 📖 SCRIPTURE FOR DEEPER STUDY (1-2 verses cited). Do not offer suggestions; only frame the action as an invitation to prayer and study.`;
 
             const insightText = await fetchGemini(prompt, systemInstruction);
             if (insightText) updateAIOutput(insightText);
@@ -870,8 +870,8 @@
 
 <body class="bg-gray-100">
     <div id="loading-screen" class="loading-screen">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#98FB98]"></div>
-        <p class="mt-4 text-lg text-[#98FB98]">Loading Anchor...</p>
+        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#b5e5cf]"></div>
+        <p class="mt-4 text-lg text-[#b5e5cf]">Loading Anchor...</p>
     </div>
 
     <div class="container">
@@ -899,7 +899,7 @@
 
 
         <!-- HEADER AND DASHBOARD -->
-        <div class="card color-mint text-white p-4" style="background-color: #98FB98;">
+        <div class="card color-mint text-white p-4" style="background-color: #b5e5cf;">
             <div class="header-content">
                 <h1 class="text-xl font-bold" style="color: #2c3e50;">The Morning Anchor Checklist</h1>
                 <p id="user-id" class="text-sm" style="color: #2c3e50;">Session: Disconnected</p>
@@ -911,7 +911,7 @@
                     <span id="streak-count" class="text-4xl font-extrabold" style="color: #2c3e50; line-height: 1;">0</span>
                 </div>
             </div>
-            <button id="reconnect-btn" class="mt-3 w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
+            <button id="reconnect-btn" class="mt-3 w-full bg-[#fcb5ac] hover:bg-[#e6a297] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
                 RECONNECT / SIGN IN
             </button>
         </div>
@@ -933,72 +933,72 @@
         <!-- 1-MINUTE READ TIMER -->
         <div class="card text-center">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">1. READ: Anchor Minute</h2>
-            <div id="timer-display" class="timer-display text-[#98FB98] mb-4">01:00</div>
-            <button id="timer-btn" class="w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-3 px-4 rounded-lg transition duration-150 ease-in-out disabled:opacity-50">
+            <div id="timer-display" class="timer-display text-[#b5e5cf] mb-4">01:00</div>
+            <button id="timer-btn" class="w-full bg-[#fcb5ac] hover:bg-[#e6a297] text-[#2c3e50] font-bold py-3 px-4 rounded-lg transition duration-150 ease-in-out disabled:opacity-50">
                 START 1-MINUTE READ
             </button>
         </div>
 
         <!-- DAILY DISCIPLINES CHECKLIST -->
         <div class="card">
-            <h2 class="text-xl font-bold text-[#98FB98] mb-3">Your Daily Disciplines</h2>
+            <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Your Daily Disciplines</h2>
             <div class="space-y-1">
                 <div class="discipline-item">
                     <label class="text-gray-700 font-medium" for="discipline-pray">🙏 1. PRAY (Conversation)</label>
-                    <input type="checkbox" id="discipline-pray" data-field="Pray" class="h-5 w-5 text-[#98FB98] rounded">
+                    <input type="checkbox" id="discipline-pray" data-field="Pray" class="h-5 w-5 text-[#b5e5cf] rounded">
                 </div>
                 <div class="discipline-item">
                     <label class="text-gray-700 font-medium" for="discipline-read">📖 2. READ (The Word)</label>
-                    <input type="checkbox" id="discipline-read" data-field="Read" class="h-5 w-5 text-[#98FB98] rounded">
+                    <input type="checkbox" id="discipline-read" data-field="Read" class="h-5 w-5 text-[#b5e5cf] rounded">
                 </div>
                 <div class="discipline-item">
                     <label class="text-gray-700 font-medium" for="discipline-learn">💡 3. LEARN (Teaching/Sermon)</label>
-                    <input type="checkbox" id="discipline-learn" data-field="Learn" class="h-5 w-5 text-[#98FB98] rounded">
+                    <input type="checkbox" id="discipline-learn" data-field="Learn" class="h-5 w-5 text-[#b5e5cf] rounded">
                 </div>
                 <div class="discipline-item">
                     <label class="text-gray-700 font-medium" for="discipline-wellness">🏃‍♀️ 4. WELLNESS (Body as Temple)</label>
-                    <input type="checkbox" id="discipline-wellness" data-field="Wellness" class="h-5 w-5 text-[#98FB98] rounded">
+                    <input type="checkbox" id="discipline-wellness" data-field="Wellness" class="h-5 w-5 text-[#b5e5cf] rounded">
                 </div>
                 <div class="discipline-item">
                     <label class="text-gray-700 font-medium" for="discipline-dream">✨ 5. DREAM/VISION LOGGED</label>
-                    <input type="checkbox" id="discipline-dream" data-field="Dream" class="h-5 w-5 text-[#98FB98] rounded">
+                    <input type="checkbox" id="discipline-dream" data-field="Dream" class="h-5 w-5 text-[#b5e5cf] rounded">
                 </div>
                 <div class="discipline-item">
                     <label class="text-gray-700 font-medium" for="discipline-journal">✍️ 6. JOURNAL ENTRY MADE</label>
-                    <input type="checkbox" id="discipline-journal" data-field="Journal" class="h-5 w-5 text-[#98FB98] rounded">
+                    <input type="checkbox" id="discipline-journal" data-field="Journal" class="h-5 w-5 text-[#b5e5cf] rounded">
                 </div>
             </div>
         </div>
 
         <!-- 5. DREAM, VISION, & KNOWLEDGE LOG -->
-        <div class="card bg-purple-50" style="background-color: #fcfcf0; border: 1px solid #98FB98;">
-            <h2 class="text-xl font-bold text-[#98FB98] mb-3">Dream, Vision, & Knowledge Log</h2>
+        <div class="card bg-purple-50" style="background-color: #fcfcf0; border: 1px solid #b5e5cf;">
+            <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Dream, Vision, & Knowledge Log</h2>
             <div class="journal-header mb-3">
                 <p class="text-sm text-gray-700">Record insights, dreams, or revelations received from God.</p>
                 <button id="mic-dream-btn" class="mic-btn" title="Start Voice Input">🎤</button>
             </div>
-            <textarea id="dream-log" rows="6" class="w-full border border-[#98FB98] p-3 rounded-lg focus:ring-[#98FB98] focus:border-[#98FB98] bg-white" placeholder="Speak or type your dreams and knowledge here..."></textarea>
-            <button id="save-dream-btn" class="mt-2 w-full bg-[#98FB98] hover:bg-[#7bc87b] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
+            <textarea id="dream-log" rows="6" class="w-full border border-[#b5e5cf] p-3 rounded-lg focus:ring-[#b5e5cf] focus:border-[#b5e5cf] bg-white" placeholder="Speak or type your dreams and knowledge here..."></textarea>
+            <button id="save-dream-btn" class="mt-2 w-full bg-[#b5e5cf] hover:bg-[#a0d2b3] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
                 SAVE DREAM/VISION LOG (Auto-Checks Box)
             </button>
         </div>
 
         <!-- 6. MORNING REFLECTION JOURNAL -->
-        <div class="card bg-blue-50" style="background-color: #fcfcf0; border: 1px solid #ffb6c1;">
-            <h2 class="text-xl font-bold text-[#98FB98] mb-3">Morning Reflection Journal</h2>
+        <div class="card bg-blue-50" style="background-color: #fcfcf0; border: 1px solid #fcb5ac;">
+            <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Morning Reflection Journal</h2>
             <div class="journal-header mb-3">
                 <p class="text-sm text-gray-700">General thoughts, gratitude, or detailed reflections.</p>
                 <button id="mic-journal-btn" class="mic-btn" title="Start Voice Input">🎤</button>
             </div>
-            <textarea id="journal-log" rows="6" class="w-full border border-[#ffb6c1] p-3 rounded-lg focus:ring-[#ffb6c1] focus:border-[#ffb6c1] bg-white" placeholder="Speak or type your general reflection here..."></textarea>
-            <button id="save-journal-btn" class="mt-2 w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
+            <textarea id="journal-log" rows="6" class="w-full border border-[#fcb5ac] p-3 rounded-lg focus:ring-[#fcb5ac] focus:border-[#fcb5ac] bg-white" placeholder="Speak or type your general reflection here..."></textarea>
+            <button id="save-journal-btn" class="mt-2 w-full bg-[#fcb5ac] hover:bg-[#e6a297] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
                 SAVE REFLECTION JOURNAL (Auto-Checks Box)
             </button>
         </div>
 
         <!-- GEMINI AI GUIDANCE TOOLS -->
         <div class="card bg-gray-50" style="background-color: #fcfcf0;">
-            <h2 class="text-xl font-bold text-[#98FB98] mb-3">✨ Spiritual Insight Tools (Gemini AI)</h2>
+            <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">✨ Spiritual Insight Tools (Gemini AI)</h2>
             
             <p class="text-sm text-gray-700 mb-4 font-semibold border-b pb-2">
                 *How to Use:* Enter a Scripture reference (e.g., John 3:16) or a Prayer Topic (e.g., Anxiety) below. Then, use the buttons for guidance.
@@ -1012,13 +1012,13 @@
             <div class="flex flex-col space-y-4">
                 
                 <!-- 1. PRAYER GENERATOR -->
-                <div class="border-b pb-4 border-[#ffb6c1]">
+                <div class="border-b pb-4 border-[#fcb5ac]">
                     <select id="prayer-style-selector" class="w-full p-2 border border-gray-300 rounded-lg mb-2 bg-white text-gray-700">
                         <option value="quick">Quick & Sweet Prayer (50-75 Words)</option>
                         <option value="intercession">Intercessory Prayer (Breakthrough/Encouragement Style)</option>
                         <option value="prophetic">Prophetic Decree (Declarative/Amanda Grace Style)</option>
                     </select>
-                    <button id="generate-prayer-btn" class="w-full bg-[#98FB98] hover:bg-[#7bc87b] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
+                    <button id="generate-prayer-btn" class="w-full bg-[#b5e5cf] hover:bg-[#a0d2b3] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
                         GENERATE 1-MINUTE MORNING PRAYER
                     </button>
                 </div>
@@ -1029,7 +1029,7 @@
                 </button>
                 
                 <!-- 3. JOURNAL ANALYZER -->
-                <button id="analyze-journal-btn" class="w-full bg-[#ffb6c1] hover:bg-[#ff9aa2] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
+                <button id="analyze-journal-btn" class="w-full bg-[#fcb5ac] hover:bg-[#e6a297] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150">
                     JOURNAL SUMMARY & GENERATE PRAYER POINTS
                 </button>
             </div>
@@ -1048,7 +1048,7 @@
 
         <!-- JOURNAL HISTORY SECTION -->
         <div class="card bg-gray-50" style="background-color: #fcfcf0;">
-            <h2 class="text-xl font-bold text-[#98FB98] mb-3">Journal History & Export</h2>
+            <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Journal History & Export</h2>
             <p class="text-sm text-gray-600 mb-4">View and export all your past reflections for scrapbooking or deeper review.</p>
             
             <div class="grid grid-cols-3 gap-2 mb-4">
@@ -1066,7 +1066,7 @@
                 Click 'LOAD FILTERED JOURNAL HISTORY' to retrieve past entries.
             </div>
 
-            <button id="copy-history-btn" class="mt-3 w-full bg-[#98FB98] hover:bg-[#7bc87b] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150 hidden">
+            <button id="copy-history-btn" class="mt-3 w-full bg-[#b5e5cf] hover:bg-[#a0d2b3] text-[#2c3e50] font-bold py-2 rounded-lg transition duration-150 hidden">
                 Copy All History Text (for Scrapbook)
             </button>
         </div>
