@@ -142,12 +142,6 @@
             margin-top: 10px;
             width: 100%;
         }
-        /* History Filter Styles */
-        .filter-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr; /* 3 columns for date/limit */
-            gap: 8px;
-        }
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -338,14 +332,8 @@
                     // Midnight has passed or first load: Clear journal boxes and save the new load date
                     document.getElementById('dream-log').value = '';
                     document.getElementById('journal-log').value = '';
-                    // Only write the load date to mark the new day if a day has actually passed
-                    if (data.lastLoadedDate) { 
-                        setDoc(docRef, { lastLoadedDate: todayKey, DreamLog: '', JournalLog: '' }, { merge: true });
-                        displayMessage('New Day started! Journal cleared.', 'success');
-                    } else {
-                         // On first ever load, just mark the date
-                        setDoc(docRef, { lastLoadedDate: todayKey }, { merge: true });
-                    }
+                    setDoc(docRef, { lastLoadedDate: todayKey, DreamLog: '', JournalLog: '' }, { merge: true });
+                    displayMessage('New Day started! Journal cleared.', 'success');
                 }
                 
                 // 1. Update Checkboxes (using the snapshot data)
@@ -353,7 +341,9 @@
                     const field = disciplines[id];
                     const checkbox = document.getElementById(id);
                     if (checkbox) {
+                        // Checkbox state is based ONLY on current snapshot data
                         checkbox.checked = !!data[field];
+                        
                         if (field === 'Read' && data[field]) {
                              document.getElementById('timer-btn').disabled = true;
                              document.getElementById('timer-btn').textContent = "READ DONE!";
@@ -369,14 +359,13 @@
                 });
 
                 // 2. Update Long Text Areas (only load data if it wasn't just cleared by new day logic)
-                // This ensures old data doesn't get pulled back in after a new day starts
+                // If the last loaded date matches today, load the text. Otherwise, keep it clear.
                 if (data.lastLoadedDate === todayKey) {
                     document.getElementById('dream-log').value = data.DreamLog || '';
                     document.getElementById('journal-log').value = data.JournalLog || '';
-                } else if (!data.lastLoadedDate) {
-                    // If the field is empty, load it
-                    document.getElementById('dream-log').value = data.DreamLog || '';
-                    document.getElementById('journal-log').value = data.JournalLog || '';
+                } else {
+                    document.getElementById('dream-log').value = '';
+                    document.getElementById('journal-log').value = '';
                 }
 
 
@@ -495,7 +484,7 @@
                     const dateMatch = (!filterStartDate || entryDate >= filterStartDate) && 
                                       (!filterEndDate || entryDate <= filterEndDate);
                     
-                    // 2. Keyword Filter (Search in both journal and dream log)
+                    // 2. Keyword Filter
                     const keywordMatch = !filterKeyword || combinedText.toLowerCase().includes(filterKeyword);
                     
                     return dateMatch && keywordMatch;
@@ -986,7 +975,7 @@
         </div>
 
         <!-- 5. DREAM, VISION, & KNOWLEDGE LOG -->
-        <div class="card bg-purple-50" style="background-color: #fcfcf0; border: 1px solid #b5e5cf;">
+        <div class="card" style="background-color: white; border: 1px solid #b5e5cf;">
             <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Dream, Vision, & Knowledge Log</h2>
             <div class="journal-header mb-3">
                 <p class="text-sm text-gray-700">Record insights, dreams, or revelations received from God.</p>
@@ -999,7 +988,7 @@
         </div>
 
         <!-- 6. MORNING REFLECTION JOURNAL -->
-        <div class="card bg-blue-50" style="background-color: #fcfcf0; border: 1px solid #fcb5ac;">
+        <div class="card" style="background-color: white; border: 1px solid #fcb5ac;">
             <h2 class="text-xl font-bold text-[#b5e5cf] mb-3">Morning Reflection Journal</h2>
             <div class="journal-header mb-3">
                 <p class="text-sm text-gray-700">General thoughts, gratitude, or detailed reflections.</p>
