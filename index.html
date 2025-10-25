@@ -299,7 +299,6 @@
 
 
         // --- DATABASE FUNCTIONS ---
-        // Note: app_id is now the projectId for the collections path
         const getDailyDocRef = (uid) => doc(db, `artifacts/${app_id}/users/${uid}/morning_checkins`, todayKey);
         const getCollectionRef = (uid) => collection(db, `artifacts/${app_id}/users/${uid}/morning_checkins`);
 
@@ -924,7 +923,7 @@
             </p>
 
             <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:focus:border-[#ccac00]">
+                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:border-[#ccac00]">
                 <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
             </div>
             
