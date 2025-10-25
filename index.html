@@ -131,9 +131,6 @@
             margin-top: 10px;
             border-radius: 8px;
             text-align: center;
-            /* Added margin and z-index to ensure visibility */
-            margin-bottom: 15px; 
-            z-index: 900; 
         }
         .emergency-btn {
             background-color: #cc0000;
@@ -147,7 +144,7 @@
     </style>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithRedirect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -159,18 +156,18 @@
         const todayKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
         const formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        // --- HARDCODED FIREBASE CONFIG (REQUIRED FOR PUBLIC HOSTING) ---
-        // *** THESE ARE NOW YOUR ACTUAL PROJECT CREDENTIALS ***
+        const app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-anchor-app';
+
+        // NOTE: These must be your actual Firebase Project keys!
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyCCUPLsELc01gUOj2VCd-B-Vof7tgJC7vg", 
             authDomain: "morning-anchor.firebaseapp.com",
             projectId: "morning-anchor",
             storageBucket: "morning-anchor.firebasestorage.app",
             messagingSenderId: "167064191841",
-            appId: "1:167064191841:web:ca6f33aa4a7f1c7e99bb20",
+            appId: "1:167064191841:web:ca6f33aa4a7f1c7e99bb20"
         };
-        const app_id = FIREBASE_CONFIG.projectId || 'default-anchor-app';
-
+        
         // Discipline IDs (mapped to database fields and UI)
         const disciplines = {
             'discipline-pray': 'Pray',
@@ -194,7 +191,6 @@
         // --- FIREBASE INITIALIZATION AND AUTHENTICATION ---
         async function initializeFirebase() {
             try {
-                // FIX: Use hardcoded config now that we are outside of Canvas environment
                 const app = initializeApp(FIREBASE_CONFIG);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -204,7 +200,8 @@
                     if (user) {
                         userId = user.uid;
                         isAuthenticated = true;
-                        document.getElementById('user-id').textContent = `Session: Connected (User ${user.displayName || user.email || userId.substring(0, 8)}...)`;
+                        // Display status using user's name/email/ID
+                        document.getElementById('user-id').textContent = `Session: Connected (${user.displayName || user.email || 'ID: ' + userId.substring(0, 8)}...)`;
                         document.getElementById('user-id').style.color = '#ffb6c1'; // Soft Pink for connected state
                         loadDailyData();
                     } else {
@@ -215,19 +212,20 @@
                         hideLoading();
                     }
                 });
-                
+
+                // NO AUTOMATIC SIGN-IN. The user must click RECONNECT.
+
                 // --- FAIL-SAFE TIMER (CRITICAL FIX) ---
                 setTimeout(() => {
                     if (document.getElementById('loading-screen').style.opacity !== '0') {
-                        displayMessage('Connection timeout. Check your network/hosting URL.', 'error');
+                        displayMessage('Connection timeout. Please check console for configuration errors.', 'error');
                         hideLoading();
                     }
                 }, 5000); // Guarantees loading screen closes after 5s
 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
-                // Display the specific crash message for the user to debug config
-                displayMessage(`App initialization failed. Error: ${error.message}. Please check Firebase Config in code.`, 'error');
+                displayMessage('App initialization failed. Check console for Firebase config errors.', 'error');
                 hideLoading();
             }
         }
@@ -237,25 +235,23 @@
                 displayMessage('Already signed in!', 'success');
                 return;
             }
-            displayMessage('Redirecting to Google Sign In...', 'success');
+            displayMessage('Opening Google Sign In...', 'success');
             
             try {
                 const provider = new GoogleAuthProvider();
-                // FINAL FIX: Use Redirect to bypass mobile pop-up block
-                await signInWithRedirect(auth, provider);
-                // The page will reload and the listener will catch the result
+                // Force a pop-up sign-in to get the strong, verifiable token
+                await signInWithPopup(auth, provider);
+                // The onAuthStateChanged listener will handle the success flow
             } catch (error) {
                 console.error("Google Sign In Failed:", error);
-                
-                let errorMessage = 'Sign In failed. You must authorize your domain in Firebase Console.';
-                
+                // Check if error is due to unauthorized domain or popup issues
                 if (error.code === 'auth/unauthorized-domain') {
-                    errorMessage = 'Error: Unauthorized Domain. You must add this URL to your Firebase Authentication settings.';
+                    displayMessage('Error: Unauthorized Domain. You must add this URL to your Firebase Auth settings.', 'error');
+                } else if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                     displayMessage('Sign In cancelled. Please ensure pop-ups are allowed.', 'error');
                 } else {
-                     errorMessage = `Sign In failed. Error: ${error.message}. Please try again.`;
+                     displayMessage(`Sign In failed (${error.code}). Please check console.`, 'error');
                 }
-
-                displayMessage(errorMessage, 'error');
             }
         }
 
@@ -340,10 +336,7 @@
                 hideLoading();
             }, (error) => {
                 console.error("Firestore Snapshot Error:", error);
-                // Only show a critical error if connection fails AFTER authentication
-                if (isAuthenticated) {
-                    displayMessage('Error loading data. Check connection and sign in.', 'error');
-                }
+                displayMessage('Error loading data. Check connection and try reconnecting.', 'error');
                 hideLoading();
             });
         }
@@ -351,7 +344,6 @@
         async function toggleDiscipline(event) {
             // PROACTIVE AUTH CHECK (Critical for saving)
             if (!isAuthenticated) {
-                document.getElementById('emergency-save-message').style.display = 'block';
                 displayMessage('Session lost. Click "RECONNECT / SIGN IN" above.', 'error');
                 return;
             }
@@ -363,7 +355,6 @@
             try {
                 await setDoc(getDailyDocRef(userId), { [field]: isChecked }, { merge: true });
                 displayMessage(`${field} status saved!`);
-                document.getElementById('emergency-save-message').style.display = 'none'; // Clear emergency message on success
             } catch (e) {
                 // FINAL FIX: This is the failure point. Prompt user to copy/refresh.
                 document.getElementById('emergency-save-message').style.display = 'block';
@@ -395,6 +386,7 @@
                 try {
                     await setDoc(getDailyDocRef(userId), { [checkboxField]: true }, { merge: true });
                 } catch (e) {
+                    // Fail gracefully
                     console.warn('Failed to auto-check box, proceeding with text save.');
                 }
             }
@@ -716,7 +708,7 @@
 
             const prompt = `Analyze the following combined journal entries and dreams. Identify the underlying struggles (e.g., financial worry, self-doubt, decision fatigue, loneliness) and any revealed desires. Based on this analysis, generate a list of 3-5 specific, actionable PRAYER POINTS framed as intercession. Do not offer direct advice; only structure the prayer points. Each prayer point MUST be grounded in Scripture and cite one relevant Bible verse in parentheses (e.g., Romans 8:28).`;
             
-            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a list of 3-5 specific PRAYER POINTS derived directly from the user's emotional struggles and needs, formatted clearly with bullet points. Do not offer suggestions; only frame the action as an an invitation to prayer.`;
+            const systemInstruction = `You are a supportive devotional assistant. Analyze the text: ${combinedText}. Your output must be a list of 3-5 specific PRAYER POINTS derived directly from the user's emotional struggles and needs, formatted clearly with bullet points. Do not offer suggestions; only frame the action as an invitation to prayer.`;
 
             const insightText = await fetchGemini(prompt, systemInstruction);
             if (insightText) updateAIOutput(insightText);
@@ -843,12 +835,6 @@
             </button>
         </div>
 
-        <!-- EMERGENCY MESSAGE CONTAINER -->
-        <div id="emergency-save-message" style="display: none;">
-            <p class="font-bold mb-2">🛑 CRITICAL SAVE FAILURE 🛑</p>
-            <p class="text-sm">Your secure session was dropped by the browser. **COPY YOUR TEXT NOW,** then click RECONNECT / SIGN IN above.</p>
-        </div>
-
         <!-- 1-MINUTE READ TIMER -->
         <div class="card text-center">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">1. READ: Anchor Minute</h2>
@@ -924,7 +910,7 @@
             </p>
 
             <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:border-[#ccac00]">
+                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:focus:border-[#ccac00]">
                 <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
             </div>
             
