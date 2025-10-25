@@ -159,17 +159,17 @@
         const todayKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
         const formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        // --- HARDCODED FIREBASE CONFIG (Required for external hosting) ---
-        // NOTE: This is a placeholder structure. User must update with their own credentials.
-        const PLACEHOLDER_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyC2qZ1m4J4J4J4J4J4J4J4J4J4J4J4J4J4J", // REPLACE THIS WITH YOUR OWN FIREBASE API KEY
-            authDomain: "YOUR-FIREBASE-PROJECT.firebaseapp.com", // REPLACE THIS
-            projectId: "your-firebase-project-id", // REPLACE THIS
-            storageBucket: "your-firebase-project.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:abcdef1234567890",
+        // --- HARDCODED FIREBASE CONFIG (REQUIRED FOR PUBLIC HOSTING) ---
+        // *** THESE ARE NOW YOUR ACTUAL PROJECT CREDENTIALS ***
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCCUPLsELc01gUOj2VCd-B-Vof7tgJC7vg", 
+            authDomain: "morning-anchor.firebaseapp.com",
+            projectId: "morning-anchor",
+            storageBucket: "morning-anchor.firebasestorage.app",
+            messagingSenderId: "167064191841",
+            appId: "1:167064191841:web:ca6f33aa4a7f1c7e99bb20",
         };
-        const app_id = PLACEHOLDER_FIREBASE_CONFIG.projectId || 'default-anchor-app';
+        const app_id = FIREBASE_CONFIG.projectId || 'default-anchor-app';
 
         // Discipline IDs (mapped to database fields and UI)
         const disciplines = {
@@ -195,7 +195,7 @@
         async function initializeFirebase() {
             try {
                 // FIX: Use hardcoded config now that we are outside of Canvas environment
-                const app = initializeApp(PLACEHOLDER_FIREBASE_CONFIG);
+                const app = initializeApp(FIREBASE_CONFIG);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
@@ -226,7 +226,8 @@
 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
-                displayMessage('App initialization failed. CHECK FIREBASE CONFIG IN CODE.', 'error');
+                // Display the specific crash message for the user to debug config
+                displayMessage(`App initialization failed. Error: ${error.message}. Please check Firebase Config in code.`, 'error');
                 hideLoading();
             }
         }
@@ -923,7 +924,7 @@
             </p>
 
             <div class="flex items-center mb-4">
-                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac00] focus:border-[#ccac00]">
+                <input id="ai-topic" type="text" placeholder="e.g., Psalm 91 or Topic: Finances" class="w-full border border-[#ccac00] p-2 rounded-lg focus:ring-[#ccac0ac00] focus:border-[#ccac00]">
                 <button id="mic-topic-btn" class="mic-btn" title="Start Voice Input for Topic">🎤</button>
             </div>
             
